@@ -45,16 +45,18 @@
 
 ## العمارة
 
-```mermaid
-flowchart LR
-    A["مصادر رسمية<br/>data.gov.ma · enssup.gov.ma<br/>مواقع مؤسسية"] --> B["Poller<br/>respect robots.txt"]
-    B --> C[("PostgreSQL 16<br/>RLS")]
-    C --> D["أرشيف عام<br/>/n/{id}"]
-    C --> E["outbox<br/>notification_deliveries"]
-    E --> F["Tira Mail<br/>POST /api/v1/outbound"]
-    F --> G["SMTP relay"]
-    G --> H["بريد المشترك"]
-    C --> I["واجهة React 19<br/>تعمل بلا JavaScript"]
+```text
+data.gov.ma    ─┐
+enssup.gov.ma  ─┼─▶ poller ─▶ PostgreSQL 16 (RLS) ─┬─▶ /n/{id}   public archive
+institutions   ─┘        (robots.txt)               │
+                                                    ├─▶ React 19  works without JS
+                                                    │
+                                                    └─▶ outbox ─▶ Tira Mail
+                                                                  POST /api/v1/outbound
+                                                                  202 Accepted
+                                                                       │
+                                                                       ▼
+                                                                  SMTP relay ─▶ inbox
 ```
 
 **حدّ المسؤولية:** Jami3ati تقرّر *ماذا* و*لمن*؛ Tira تنفّذ *كيف*. بينهما عقد HTTP
