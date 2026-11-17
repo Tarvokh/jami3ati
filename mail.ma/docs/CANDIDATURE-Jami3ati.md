@@ -52,7 +52,7 @@
 
 - **data.gov.ma** — مجموعات البيانات المتعلقة بالتعليم العالي.
 - **enssup.gov.ma** — البلاغات والتوجيهات الرسمية.
-- **المواقع المؤسسية** لـ UM5، ENSIAS، UCA، FST-Guéliz — **4 مؤسسات متحقَّق منها حاليًا** (`verified`)، مع عيّنات `needs_review` و`demo` موسومة بوضوح ولا تُعرض كمعلومة مؤكدة.
+- **المواقع المؤسسية** لـ UM5، ENSIAS، UCA، FST-Guéliz — أربعة مصادر كلّها `verified`. الكتالوج التجريبي (`src/data/seedData.ts`) يعرض **12 كيانًا**: 3 جامعات (2 `verified`، 1 `needs_review`) و 9 مؤسسات (8 `verified`، 1 `demo` موسومة بوضوح). قاعدة العرض `jami3ati_demo` تحتوي **3 كيانات** فقط (جامعتان + مؤسسة واحدة)، كلها `verified`.
 
 **قيد مُعلَن:** لا يوجد API رسمي بعد. لذلك نعتمد استقصاءً دوريًا (periodic polling) محترمًا لـ `robots.txt` وبمعدّل منخفض — لا scraping واسع.
 
@@ -100,7 +100,7 @@
 ## 10. ما لا ندّعيه
 
 - لا ندّعي توقيعًا رقميًا من أي وزارة أو مؤسسة.
-- لا ندّعي تغطية وطنية: **4 مؤسسات** متحقَّق منها، وهذا رقم مقاس لا تقديري.
+- لا ندّعي تغطية وطنية: الكتالوج التجريبي يغطّي **12 كيانًا** (3 جامعات + 9 مؤسسات)، منها **10 `verified`**، وقاعدة العرض `jami3ati_demo` تحتوي **3 كيانات** `verified`. هذا نموذج مقاس، لا تغطية وطنية.
 - لا ندّعي أن DKIM سيظهر أخضر على المسرح؛ صفحة `/n/{id}` و`source_url` هما الدليل الأساسي.
 - لا نفتح تسجيلًا عامًا قبل الحدث — العرض يستعمل صندوقًا مُهيّأً مسبقًا، لأن فتح signup بلا سمعة نطاق مخاطرة بلا مقابل.
 
@@ -151,7 +151,7 @@ Nous ne disons **pas** « signé par le ministère ». Nous disons : « ce fait 
 
 - **data.gov.ma** — jeux de données liés à l'enseignement supérieur.
 - **enssup.gov.ma** — communiqués et orientations officielles.
-- **Sites institutionnels** : UM5, ENSIAS, UCA, FST-Guéliz — **4 établissements vérifiés** à ce jour, avec des échantillons `needs_review` et `demo` clairement étiquetés.
+- **Sites institutionnels** : UM5, ENSIAS, UCA, FST-Guéliz — quatre sources toutes `verified`. Le catalogue de démonstration (`src/data/seedData.ts`) expose **12 entités** : 3 universités (2 `verified`, 1 `needs_review`) et 9 établissements (8 `verified`, 1 `demo` clairement étiqueté). La base de démonstration `jami3ati_demo` ne contient que **3 entités** (2 universités + 1 établissement), toutes `verified`.
 
 **Limite assumée :** pas d'API officielle à ce jour. Nous utilisons un polling périodique respectueux de `robots.txt` et à faible fréquence — pas de scraping massif.
 
@@ -199,7 +199,7 @@ E-mail uniquement dans la version pilote (pas de SMS, pas de téléphone). Conse
 ## 10. Ce que nous ne prétendons pas
 
 - Aucune signature numérique d'un ministère ou d'un établissement.
-- Aucune couverture nationale : **4 établissements** vérifiés — un chiffre mesuré, non estimé.
+- Aucune couverture nationale : le catalogue de démonstration couvre **12 entités** (3 universités + 9 établissements), dont **10 `verified`** ; la base `jami3ati_demo` en contient **3**. C'est un échantillon mesuré, pas une couverture.
 - Aucune promesse de DKIM « vert » sur scène ; `/n/{id}` et `source_url` sont la preuve principale.
 - Pas d'inscription publique avant l'événement : la démo utilise une boîte pré-provisionnée.
 
@@ -210,5 +210,5 @@ E-mail uniquement dans la version pilote (pas de SMS, pas de téléphone). Conse
 - [x] استبدال الأقواس بأسماء الفريق في الجدولين (AR وFR): Sami Benali ، Ismail Benali ، Elmoufid Hamza.
 - [ ] التأكد من صيغة حقول الاستمارة (عدد الكلمات / الحقول الإلزامية).
 - [ ] إرفاق رابط المستودع أو لقطة شاشة للواجهة (إن طُلب).
-- [ ] التحقق من أن كل رقم مذكور أعلاه ما زال مقاسًا يوم الإرسال (276 اختبارًا، 4 مؤسسات).
+- [ ] التحقق من أن كل رقم مذكور أعلاه ما زال مقاسًا يوم الإرسال (276 اختبارًا Tira، 57 اختبارًا Jami3ati، 12 كيانًا في الكتالوج منها 10 `verified`).
 - [ ] الإرسال قبل **الجمعة 20 نوفمبر 2026، 16:30** بتوقيت المغرب.
