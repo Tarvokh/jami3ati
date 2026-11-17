@@ -1,0 +1,57 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/tira-api",
+    "crates/tira-auth",
+    "crates/tira-frontend",
+    "crates/tira-module",
+    "crates/tira-provision",
+    "crates/tira-smtp",
+    "crates/tira-store",
+    "crates/tira-vault",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+authors = ["TIRA LABS"]
+repository = "https://ifru.ma"
+
+# Versions are pinned deliberately. Do not bump a crate without reading its
+# changelog: several of these had breaking API changes in 2025-2026.
+[workspace.dependencies]
+tokio = { version = "1.40", features = ["full"] }
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+async-trait = "0.1"
+axum = "0.8"
+tower = { version = "0.5", features = ["util"] }
+mail-parser = "0.11"
+# TLS backend: rustls (ring-backed, reproducible builds) instead of
+# native-tls (SChannel on Windows / OpenSSL on Linux). The SMTP server in
+# this build speaks plaintext on loopback only; rustls covers the submission
+# client path. Revisit before any production deployment that requires TLS.
+lettre = { version = "0.11", default-features = false, features = [
+    "smtp-transport",
+    "pool",
+    "hostname",
+    "builder",
+    "tokio1",
+    "tokio1-rustls-tls",
+] }
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+base64 = "0.22"
+# Storage. `tokio-postgres` (not sqlx) because we use runtime queries and do
+# not want a build-time DATABASE_URL dependency in CI.
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-uuid-1", "with-serde_json-1"] }
+deadpool-postgres = "0.14"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+sha2 = "0.10"
+hex = "0.4"

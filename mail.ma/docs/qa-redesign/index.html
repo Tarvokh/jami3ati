@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tira Mail — معرض التحقق البصري (الخطوة 1 + عرض الرسالة + الهوية)</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f8fa; --surface: #ffffff; --text: #0b1f33; --muted: #5a6b7d;
+    --line: #e2e7ee; --accent: #007c7c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0b1220; --surface: #121c2b; --text: #e9f0fa; --muted: #9aabc0; --line: #26364c; --accent: #5fd3d3; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, system-ui, sans-serif;
+    font-size: 15px; line-height: 1.75;
+  }
+  main { max-width: 1200px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 28px; font-weight: 600; margin: 0 0 6px; }
+  h2 { font-size: 20px; font-weight: 600; margin: 40px 0 12px; }
+  p { margin: 0 0 12px; color: var(--muted); }
+  .lead { max-width: 80ch; }
+  .badge {
+    display: inline-block; padding: 2px 10px; border: 1px solid var(--line);
+    border-radius: 999px; background: var(--surface); font-size: 12.5px; color: var(--muted);
+    margin-inline-end: 6px;
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; }
+  figure {
+    margin: 0; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 14px; overflow: hidden;
+  }
+  figure img { display: block; width: 100%; height: auto; }
+  figcaption { padding: 10px 14px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); }
+  figcaption strong { color: var(--text); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  th, td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: start; font-size: 13.5px; }
+  th { font-weight: 600; background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  tr:last-child td { border-bottom: 0; }
+  code { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12.5px; direction: ltr; display: inline-block; }
+  .ok { color: #1f7a4d; font-weight: 600; }
+  .note { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-size: 13.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tira Mail — معرض التحقق البصري</h1>
+  <p class="lead">
+    الخطوة 1 من إعادة التصميم (اتجاه «هدوء»)، ثم تحسين صفحة عرض الرسالة إلى تخطيط قراءة
+    احترافي، ثم الدخول بكلمة المرور والملف الشخصي بجلسات قابلة للإلغاء.
+    كل الصور مأخوذة من الخادم الحقيقي <code>127.0.0.1:8099</code> ببيانات حقيقية من PostgreSQL
+    — لا لقطات مُعدّلة ولا بيانات وهمية.
+  </p>
+  <p>
+    <span class="badge">2026-11-07 / 2026-11-08</span>
+    <span class="badge">Argon2id</span>
+    <span class="badge">HttpOnly session</span>
+    <span class="badge">headless Chrome</span>
+    <span class="badge">1440×1000</span>
+    <span class="badge">760×1000</span>
+    <span class="badge">390×844</span>
+    <span class="badge">RTL</span>
+    <span class="badge">light + dark</span>
+  </p>
+
+  <h2>سطح المكتب — الوضع الفاتح</h2>
+  <div class="grid">
+    <figure>
+      <img src="login-light.png" alt="شاشة الدخول الأولى بالتوكن، الوضع الفاتح">
+      <figcaption><strong>الدخول (الخطوة 1 — سابقًا)</strong> — بطاقة مركزية 440px وتوكن HttpOnly. استُبدل هذا الشكل بنموذج كلمة المرور أدناه.</figcaption>
+    </figure>
+    <figure>
+      <img src="inbox-light.png" alt="قائمة الوارد، الوضع الفاتح">
+      <figcaption><strong>الوارد</strong> — شريط جانبي 232px، صفوف حقيقية، ميزات غير المتاحة مطويّة تحت «غير متاح بعد».</figcaption>
+    </figure>
+    <figure>
+      <img src="message-light.png" alt="قراءة رسالة، الوضع الفاتح">
+      <figcaption><strong>الرسالة</strong> — عمود قراءة بعرض 68ch بالضبط، تنزيل <code>.eml</code>، النص فقط.</figcaption>
+    </figure>
+  </div>
+
+  <h2>سطح المكتب — الوضع الداكن</h2>
+  <div class="grid">
+    <figure>
+      <img src="login-dark.png" alt="شاشة الدخول، الوضع الداكن">
+      <figcaption><strong>الدخول</strong> — ألوان داكنة تلقائية حسب النظام (<code>prefers-color-scheme</code>).</figcaption>
+    </figure>
+    <figure>
+      <img src="inbox-dark.png" alt="قائمة الوارد، الوضع الداكن">
+      <figcaption><strong>الوارد</strong> — نفس البنية والألوان الدلالية بتباين 16.32:1.</figcaption>
+    </figure>
+    <figure>
+      <img src="message-dark.png" alt="قراءة رسالة، الوضع الداكن">
+      <figcaption><strong>الرسالة</strong> — لا يتغيّر التخطيط، فقط الرموز اللونية.</figcaption>
+    </figure>
+  </div>
+
+  <h2>الجوال — 390×844</h2>
+  <div class="grid">
+    <figure>
+      <img src="inbox-mobile-390.png" alt="الوارد على الجوال">
+      <figcaption><strong>الوارد</strong> — بلا تمرير أفقي، الشريط الجانبي يصبح صفًا أفقيًا.</figcaption>
+    </figure>
+    <figure>
+      <img src="message-mobile-390.png" alt="الرسالة على الجوال">
+      <figcaption><strong>الرسالة (الخطوة 1)</strong> — عمود واحد، أحجام لمس 44px.</figcaption>
+    </figure>
+  </div>
+
+  <h2>تحسين عرض الرسالة — تخطيط قراءة احترافي</h2>
+  <p class="lead">
+    جسم الرسالة في العمود الرئيسي بعرض 68ch، وبطاقة جانبية ثابتة للمرسل والنطاق والتاريخ والحجم
+    و<code>Message-ID</code> والمعرّف. شريط أدوات ثابت تحت الشريط العلوي، وزرّا «نسخة للطباعة»
+    و«تنزيل .eml» وجهتان حقيقيتان (لا JavaScript ولا نافذة طباعة وهمية). أُزيلت تفاصيل الترويسات
+    المطوية المكرّرة لأن البطاقة الجانبية أصبحت المصدر الوحيد للبيانات الوصفية.
+  </p>
+  <div class="grid">
+    <figure>
+      <img src="message-light-1440.png" alt="عرض الرسالة الجديد، سطح المكتب، الوضع الفاتح">
+      <figcaption><strong>سطح المكتب — فاتح</strong> — شريط ثابت 62px، جسم 612px = 68ch، بطاقة جانبية 280px.</figcaption>
+    </figure>
+    <figure>
+      <img src="message-dark-1440.png" alt="عرض الرسالة الجديد، سطح المكتب، الوضع الداكن">
+      <figcaption><strong>سطح المكتب — داكن</strong> — نفس البنية، تباين النص 14.93:1 وبيانات البطاقة 10.96:1.</figcaption>
+    </figure>
+    <figure>
+      <img src="message-light-760.png" alt="عرض الرسالة على عرض 760">
+      <figcaption><strong>760px</strong> — البطاقة الجانبية تنزل تحت الرسالة، بلا تمرير أفقي.</figcaption>
+    </figure>
+    <figure>
+      <img src="message-light-390.png" alt="عرض الرسالة على الجوال 390">
+      <figcaption><strong>390px</strong> — شريط الأدوات يلتف إلى سطرين، والجسم 336px بلا قصّ.</figcaption>
+    </figure>
+    <figure>
+      <img src="message-print-1440.png" alt="نسخة الطباعة المستقلة">
+      <figcaption><strong>نسخة للطباعة</strong> — صفحة مستقلة <code>/print</code>؛ تُخفي شريط الأدوات عند الطباعة وتُبقي الترويسات كاملة.</figcaption>
+    </figure>
+  </div>
+
+  <h2>الهوية — الدخول بكلمة المرور والملف الشخصي</h2>
+  <p class="lead">
+    الدخول صار تقليديًا: بريد إلكتروني + كلمة مرور محلية لـ Tira، تُتحقَّق بـ
+    <code>Argon2id</code> داخل <code>spawn_blocking</code>. الجلسة توكن عشوائي في كوكي
+    <code>HttpOnly</code> + <code>SameSite=Strict</code> بعمر 7 أيام، قابل للإلغاء من الملف الشخصي.
+    دخول التوكن بقي بابًا ثانيًا للتهيئة والاستعادة فقط. الملف الشخصي يعرض العنوان الحقيقي،
+    ويحفظ الاسم الظاهر، ويضبط/يغيّر كلمة المرور، ويسرد الجلسات النشطة ويُلغيها.
+  </p>
+  <div class="grid">
+    <figure>
+      <img src="login-password-light.png" alt="شاشة الدخول بكلمة المرور، الوضع الفاتح">
+      <figcaption><strong>الدخول — فاتح</strong> — النموذج الافتراضي: بريد + كلمة مرور، ورسائل خطأ عربية دقيقة.</figcaption>
+    </figure>
+    <figure>
+      <img src="login-password-dark.png" alt="شاشة الدخول بكلمة المرور، الوضع الداكن">
+      <figcaption><strong>الدخول — داكن</strong> — نفس البنية والتباين، بلا تغيير في التخطيط.</figcaption>
+    </figure>
+    <figure>
+      <img src="profile-light.png" alt="صفحة الملف الشخصي، الوضع الفاتح">
+      <figcaption><strong>الملف الشخصي — فاتح</strong> — الاسم الظاهر، كلمة المرور، والجلسات النشطة مع شارة «الجلسة الحالية».</figcaption>
+    </figure>
+    <figure>
+      <img src="profile-dark.png" alt="صفحة الملف الشخصي، الوضع الداكن">
+      <figcaption><strong>الملف الشخصي — داكن</strong> — تباين 16.32:1 للنص الأساسي و7.99:1 للنص الثانوي.</figcaption>
+    </figure>
+    <figure>
+      <img src="profile-mobile-390.png" alt="صفحة الملف الشخصي على الجوال 390">
+      <figcaption><strong>390px</strong> — عمود واحد، أزرار بعرض كامل، بلا تمرير أفقي.</figcaption>
+    </figure>
+  </div>
+
+  <h2>قياسات آلية (من DOM الحقيقي)</h2>
+  <table>
+    <thead>
+      <tr><th>البند</th><th>الفاتح</th><th>الداكن</th><th>المطلوب</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>تباين النص الأساسي على الخلفية</td><td>15.71:1</td><td>16.32:1</td><td class="ok">≥ 4.5:1 ✓</td></tr>
+      <tr><td>تباين النص الثانوي (meta)</td><td>5.15:1</td><td>7.99:1</td><td class="ok">≥ 4.5:1 ✓</td></tr>
+      <tr><td>تباين الموضوع في القائمة</td><td>9.58:1</td><td>—</td><td class="ok">≥ 4.5:1 ✓</td></tr>
+      <tr><td>تباين المقتطف</td><td>5.48:1</td><td>—</td><td class="ok">≥ 4.5:1 ✓</td></tr>
+      <tr><td>تباين العنوان البريدي</td><td>5.25:1</td><td>—</td><td class="ok">≥ 4.5:1 ✓</td></tr>
+      <tr><td>الشريط العلوي</td><td>56px</td><td>56px</td><td class="ok">56px ✓</td></tr>
+      <tr><td>الشريط الجانبي</td><td>232px</td><td>232px</td><td class="ok">232px ✓</td></tr>
+      <tr><td>عمود القراءة</td><td>612px = 68ch</td><td>612px</td><td class="ok">≤ 68ch ✓</td></tr>
+      <tr><td>حجم نص القراءة</td><td>15px / 28.5px</td><td>15px</td><td class="ok">15px / 1.75+ ✓</td></tr>
+      <tr><td>تخطيط عرض الرسالة</td><td>728 + 16 + 280px</td><td>نفسه</td><td class="ok">عمودان + بطاقة ✓</td></tr>
+      <tr><td>شريط أدوات الرسالة</td><td>62px · sticky</td><td>62px · sticky</td><td class="ok">تحت الشريط العلوي ✓</td></tr>
+      <tr><td>بطاقة البيانات الجانبية</td><td>280px · sticky</td><td>280px · sticky</td><td class="ok">تنزل تحت الرسالة ≤ 900px ✓</td></tr>
+      <tr><td>تباين بيانات البطاقة</td><td>9.58:1</td><td>10.96:1</td><td class="ok">≥ 4.5:1 ✓</td></tr>
+      <tr><td>طباعة (شاشة / ورق)</td><td>تُخفي الشريط والجانبي والتنبيهات</td><td>—</td><td class="ok">ورق A4 بلا JS ✓</td></tr>
+      <tr><td>تمرير أفقي (1440 / 760 / 390)</td><td>لا</td><td>لا</td><td class="ok">لا ✓</td></tr>
+      <tr><td>طلبات خارجية</td><td>0</td><td>0</td><td class="ok">0 ✓</td></tr>
+      <tr><td>روابط ميتة <code>href="#"</code></td><td>0</td><td>0</td><td class="ok">0 ✓</td></tr>
+      <tr><td>خط IBM Plex Sans Arabic</td><td>مُحمَّل محليًا</td><td>مُحمَّل محليًا</td><td class="ok">self-hosted ✓</td></tr>
+      <tr><td>تجزئة كلمة المرور</td><td colspan="2"><code>Argon2id</code> · <code>m=19456 KiB, t=2, p=1</code></td><td class="ok">خارج الصفحة الرئيسية (spawn_blocking) ✓</td></tr>
+      <tr><td>كوكي الجلسة</td><td colspan="2"><code>tira_token</code> · HttpOnly · SameSite=Strict · 7 أيام</td><td class="ok">لا توكن في JS أو localStorage ✓</td></tr>
+      <tr><td>حد المحاولات</td><td colspan="2">8 إخفاقات / 10 دقائق لكل <code>email|IP</code></td><td class="ok">429 + <code>Retry-After: 600</code> ✓</td></tr>
+      <tr><td>تغيير كلمة المرور</td><td colspan="2">يُلغي كل الجلسات الأخرى ويُبقي الحالية</td><td class="ok">303 <code>password-changed</code> ✓</td></tr>
+      <tr><td>حماية CSRF</td><td colspan="2">فحص <code>Origin</code> / <code>Sec-Fetch-Site</code> + SameSite</td><td class="ok">POST خارجي مرفوض 403 ✓</td></tr>
+      <tr><td>الملف الشخصي عند 390</td><td colspan="2">لا تمرير أفقي (<code>scrollWidth == clientWidth</code>)</td><td class="ok">عمود واحد ✓</td></tr>
+      <tr><td>عزل بيانات الاعتماد</td><td colspan="2"><code>mailbox_credentials</code> بسياسة deny-all لـ <code>tira_app</code></td><td class="ok">لا يقرأ التجزئات أبدًا ✓</td></tr>
+    </tbody>
+  </table>
+
+  <h2>ملاحظات صادقة</h2>
+  <div class="note">
+    <p>
+      <strong>الدخول والملف الشخصي أُنجزا فعلاً</strong> على الخادم الحقيقي: كلمة المرور تُجزَّأ
+      بـ <code>Argon2id</code> وتُخزَّن في جدول <code>mailbox_credentials</code> محمي بسياسة
+      deny-all، فلا يستطيع دور التطبيق <code>tira_app</code> قراءتها. الجلسة تُنشأ في
+      <code>api_tokens</code> بوسم <code>session:web</code>، وتُلغى من الملف الشخصي، ويُلغي تغيير
+      كلمة المرور كل الجلسات الأخرى.
+    </p>
+    <p>
+      <strong>حدود حقيقية يجب قولها:</strong> كلمة المرور هذه محلية لـ Tira وليست كلمة مرور
+      Stalwart/IMAP — Stalwart متوقف، فلا يمكن اختبار مصادقة المحرّك. ودخول التوكن باقٍ عمدًا
+      كباب تهيئة/استعادة (توكن ← الملف الشخصي ← ضبط كلمة مرور)، وليس بديلًا مخفيًا.
+      توكن الفحص <code>qa-redesign-20261107</code> أُلغي تلقائيًا عند تدوير كلمة المرور،
+      والجلسة النشطة الوحيدة الآن هي جلسة العرض <code>session:web</code>.
+    </p>
+    <p>
+      <strong>عرض الرسالة أُنجز فعلاً</strong> فوق الخطوة 1: البطاقة الجانبية هي المصدر الوحيد
+      للبيانات الوصفية بعد حذف تفاصيل الترويسات المكرّرة، وزرّا «نسخة للطباعة» و«تنزيل .eml»
+      وجهتان حقيقيتان على الخادم — لا نافذة طباعة وهمية ولا JavaScript. صفحة <code>/print</code>
+      تعمل بلا JavaScript، وتُخفي عند الطباعة كل عناصر التنقل.
+    </p>
+    <p>لم يُبنَ بعد (معلن، لا مخفي):</p>
+    <ul>
+      <li>عرض ثلاثي الأعمدة (split view) مع روابط عميقة — الخطوة 2.</li>
+      <li>مبدّل الوضع الفاتح/الداكن اليدوي — يتبع النظام حاليًا فقط.</li>
+      <li>تحليل ترويسات RFC الخام والمرفقات — قرار نطاق، لا نقص.</li>
+      <li>الرد والبحث والمجلدات والنجوم — معطّلة بشكل ظاهر مع سبب، بانتظار المخطط أو Stalwart.</li>
+      <li>توقيع البريد، الصورة الرمزية المخصّصة، وتفضيلات العرض — مؤجّلة إلى P2 بعد قرار النطاق.</li>
+      <li>استعادة كلمة المرور عبر البريد — تحتاج مسار إرسال يعتمد على Stalwart.</li>
+      <li>مصادقة المحرّك (Stalwart/IMAP) بكلمة المرور نفسها — متوقفة على تشغيل Stalwart وربطه.</li>
+    </ul>
+    <p>
+      الخطوط الثمانية (IBM Plex Sans Arabic 400/500/600/700، عربي + لاتيني) مُضمّنة في الملف التنفيذي
+      وتُقدَّم من نفس الخادم مع <code>font/woff2</code> و<code>immutable</code>؛ لا يوجد أي طلب خارجي.
+      الاعتماد البصري النهائي يبقى بيد المالك — النموذج لا يقبل صوراً.
+    </p>
+  </div>
+</main>
+</body>
+</html>

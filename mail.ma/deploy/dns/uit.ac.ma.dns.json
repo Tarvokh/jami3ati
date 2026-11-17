@@ -1,0 +1,59 @@
+{
+    "domain":  "uit.ac.ma",
+    "generatedAt":  "2026-11-06T17:32:59.1217585Z",
+    "zoneFile":  "uit.ac.ma.zone",
+    "dmarcPolicy":  "engine",
+    "records":  18,
+    "activeKeys":  [
+                       {
+                           "selector":  "v1-rsa-20261105",
+                           "type":  "Dkim1RsaSha256"
+                       },
+                       {
+                           "selector":  "v1-ed25519-20261105",
+                           "type":  "Dkim1Ed25519Sha256"
+                       }
+                   ],
+    "findings":  [
+                     {
+                         "level":  "ok",
+                         "code":  "spf",
+                         "message":  "SPF present: v=spf1 mx -all"
+                     },
+                     {
+                         "level":  "ok",
+                         "code":  "mx",
+                         "message":  "MX present: uit.ac.ma. IN MX 10 mail.tira.test."
+                     },
+                     {
+                         "level":  "warn",
+                         "code":  "mail-host-external",
+                         "message":  "MX host 'mail.tira.test' is outside 'uit.ac.ma' (a shared/borrowed engine host, expected mail.uit.ac.ma). Confirm this is an intentional multi-domain or demo delegation before publishing."
+                     },
+                     {
+                         "level":  "ok",
+                         "code":  "dmarc",
+                         "message":  "DMARC present: v=DMARC1; p=reject; rua=mailto:postmaster@uit.ac.ma"
+                     },
+                     {
+                         "level":  "ok",
+                         "code":  "mta-sts",
+                         "message":  "MTA-STS present"
+                     },
+                     {
+                         "level":  "ok",
+                         "code":  "tls-rpt",
+                         "message":  "TLS-RPT present"
+                     },
+                     {
+                         "level":  "ok",
+                         "code":  "dkim-rsa",
+                         "message":  "selector v1-rsa-20261105: RSA 2048 bit"
+                     },
+                     {
+                         "level":  "ok",
+                         "code":  "dkim-ed25519",
+                         "message":  "selector v1-ed25519-20261105: Ed25519 32-byte key"
+                     }
+                 ]
+}

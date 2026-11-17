@@ -1,0 +1,35 @@
+; Tira Mail - demo/exported zone for the reserved documentation domain tira.test
+; (RFC 6761 .test). Generated from a single local Stalwart engine for the
+; hackathon control-plane proof; this is NOT a production DNS delegation.
+; The mail host mail.tira.test is shared by every demo domain on this engine.
+v1-ed25519-20261104._domainkey.tira.test. IN TXT "v=DKIM1; k=ed25519; h=sha256; p=qYRkQNDHN+BfUa80mEaBz6L+2r0cw6ky8s6XQz+TBq0="
+v1-rsa-20261104._domainkey.tira.test. IN TXT (
+    "v=DKIM1; k=rsa; h=sha256; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo70ODbzdL0BYz4T6RDC40OdZBQwQiu2k2gy2pvKc910ntird9q0/2cMQTnHsYxt4cepIrQzYUCorgKwAmaz3TcmuzA6JLRQzXDKobyr1HMnp+K5ivp4f7QfjlWqd9OmHeUWAeKzoNvM1qHGGwsJiYPVvgFE+vZLJ7ZAeCo58jIplCp3dTAOGlpF"
+    "SnyGXbNPKyAP20KSllenZh26t03BhCc/vIlkDLmIWsS/n2YAvQQiS79sCkcy4t3QIFe5ZTFB7brBIfzYj/GzonmjVFQw9NC8gPK7KC1N7uOGRJqPYATAkmVyQrGsldQZadSqhtkCL4kl/czNi+LfniFQXoeuw7QIDAQAB"
+)
+_465._tcp.mail.tira.test. IN TLSA 3 1 1 5499a65c84053606fe55116435c78d664035dbba2885a67ec45d520d716a2af7
+_25._tcp.mail.tira.test. IN TLSA 3 1 1 5499a65c84053606fe55116435c78d664035dbba2885a67ec45d520d716a2af7
+_993._tcp.mail.tira.test. IN TLSA 3 1 1 5499a65c84053606fe55116435c78d664035dbba2885a67ec45d520d716a2af7
+_443._tcp.mail.tira.test. IN TLSA 3 1 1 5499a65c84053606fe55116435c78d664035dbba2885a67ec45d520d716a2af7
+_995._tcp.mail.tira.test. IN TLSA 3 1 1 5499a65c84053606fe55116435c78d664035dbba2885a67ec45d520d716a2af7
+mail.tira.test. IN TXT "v=spf1 a -all"
+tira.test. IN TXT "v=spf1 mx -all"
+tira.test. IN MX 10 mail.tira.test.
+_dmarc.tira.test. IN TXT "v=DMARC1; p=reject; rua=mailto:postmaster@tira.test"
+_caldavs._tcp.tira.test. IN SRV 0 1 443 mail.tira.test.
+_carddavs._tcp.tira.test. IN SRV 0 1 443 mail.tira.test.
+_imaps._tcp.tira.test. IN SRV 0 1 993 mail.tira.test.
+_jmap._tcp.tira.test. IN SRV 0 1 443 mail.tira.test.
+_pop3s._tcp.tira.test. IN SRV 0 1 995 mail.tira.test.
+_submissions._tcp.tira.test. IN SRV 0 1 465 mail.tira.test.
+mta-sts.tira.test. IN CNAME mail.tira.test.
+_mta-sts.tira.test. IN TXT "v=STSv1; id=17963816207469398229"
+_smtp._tls.tira.test. IN TXT "v=TLSRPTv1; rua=mailto:postmaster@tira.test"
+ua-auto-config.tira.test. IN CNAME mail.tira.test.
+_ua-auto-config.tira.test. IN TXT "v=UAAC1; a=sha256; d=5TJWw5WSzUDI4xdRS3Hl3KomN3G3+9d5XwAdnAzFyeU="
+autoconfig.tira.test. IN CNAME mail.tira.test.
+autodiscover.tira.test. IN CNAME mail.tira.test.
+
+v1-ed25519-20261112._domainkey.tira.test. IN TXT "v=DKIM1; k=ed25519; h=sha256; p=2LhCfTA59cvh6okCcnVG/uXdXiP7Hg9sqLlam/XLapw="
+v1-rsa-20261112._domainkey.tira.test. IN TXT "v=DKIM1; k=rsa; h=sha256; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlbBmVPRcDxYehEl8+ZSVlti4as40Wy3gsBvSQXwBjsJed4cNiFNIFrbOX5jvYXE0zHOp+A1kBjH8qkZAaP2ym4/VvE1O+1o/Y70utCPH7I6PGKXWOWbAhEvMgNp5RwN6WzmRTpKwBh3EHaCaisNrvVzvFnrN/QjRpRoZEF2jZnCcoEufyJGCqmsaas7oep71emjtWUKC63Pbu1fwPGyMINIYfmae2b8XQqiqA7pWMuDKB4GPGxJYp4nTwkYD8UVN6ST4ihRuNZnYjjAP7Wqs2qWwjGi4ls2AW/nN1Gx6dpsCSTSRqkDiDHdQv7SJSwpZ8J2B+sp/7GGlBiXF+4f24QIDAQAB"
+

@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tira Mail — الخريطة العميقة</title>
+<style>
+  :root{
+    --bg:#0B1220; --surface:#111A2B; --surface2:#0E1626;
+    --line:#1E2B42; --text:#E6EDF7; --muted:#8A9AB4;
+    --accent:#00A8A8; --navy:#0B2545;
+    --ok:#2EBD85; --warn:#F5A524; --bad:#E5484D;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:Inter,"Cairo","Segoe UI",system-ui,-apple-system,sans-serif;
+    line-height:1.65; font-size:15px;
+  }
+  .wrap{max-width:1120px;margin:0 auto;padding:40px 22px 80px}
+  header{border-bottom:1px solid var(--line);padding-bottom:24px;margin-bottom:32px}
+  .brand{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .logo{
+    width:34px;height:34px;border-radius:9px;
+    background:linear-gradient(135deg,var(--accent),var(--navy));
+    display:grid;place-items:center;font-weight:700;font-size:16px;color:#fff
+  }
+  h1{font-size:26px;margin:0;letter-spacing:-.3px}
+  .sub{color:var(--muted);font-size:13.5px;margin-top:6px}
+  h2{
+    font-size:18px;margin:44px 0 16px;padding-right:12px;
+    border-right:3px solid var(--accent);letter-spacing:-.2px
+  }
+  h2 .n{color:var(--accent);font-variant-numeric:tabular-nums;margin-left:8px;font-size:14px}
+  p{color:var(--muted);margin:0 0 14px}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+  .metric{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .metric .v{font-size:24px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+  .metric .k{color:var(--muted);font-size:12px;margin-top:2px}
+  .metric.ok .v{color:var(--ok)}
+  .metric.warn .v{color:var(--warn)}
+
+  .stack{display:flex;flex-direction:column;gap:10px}
+  .layer{
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:14px 16px;display:grid;grid-template-columns:170px 1fr auto;gap:14px;align-items:center
+  }
+  .layer .name{font-weight:600;font-size:14px;font-family:ui-monospace,"Cascadia Code",monospace;direction:ltr;text-align:right}
+  .layer .desc{color:var(--muted);font-size:13px}
+  .layer .desc b{color:var(--text);font-weight:600}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-left:8px;vertical-align:middle}
+  .d-ok{background:var(--ok);box-shadow:0 0 10px rgba(46,189,133,.5)}
+  .d-warn{background:var(--warn);box-shadow:0 0 10px rgba(245,165,36,.5)}
+  .d-bad{background:var(--bad);box-shadow:0 0 10px rgba(229,72,77,.5)}
+  .badge{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+  .b-ok{color:var(--ok);border-color:rgba(46,189,133,.35);background:rgba(46,189,133,.08)}
+  .b-warn{color:var(--warn);border-color:rgba(245,165,36,.35);background:rgba(245,165,36,.08)}
+  .b-bad{color:var(--bad);border-color:rgba(229,72,77,.35);background:rgba(229,72,77,.08)}
+
+  .gaps{display:flex;flex-direction:column;gap:9px}
+  .gap{display:grid;grid-template-columns:44px 1fr 52px;gap:12px;align-items:center;font-size:13px}
+  .gap .id{color:var(--muted);font-family:ui-monospace,monospace;font-size:12px;direction:ltr}
+  .gap .track{background:var(--surface2);border-radius:6px;height:26px;position:relative;overflow:hidden;border:1px solid var(--line)}
+  .gap .fill{height:100%;border-radius:5px;background:linear-gradient(90deg,rgba(0,168,168,.85),rgba(0,168,168,.35))}
+  .gap .fill.hot{background:linear-gradient(90deg,rgba(229,72,77,.9),rgba(229,72,77,.3))}
+  .gap .fill.mid{background:linear-gradient(90deg,rgba(245,165,36,.9),rgba(245,165,36,.3))}
+  .gap .fill.done{background:linear-gradient(90deg,rgba(46,189,133,.9),rgba(46,189,133,.3))}
+  .gap .lbl{position:absolute;right:10px;top:0;height:100%;display:flex;align-items:center;font-size:12px;color:var(--text);white-space:nowrap}
+  .gap .w{color:var(--muted);font-size:12px;text-align:left;direction:ltr;font-variant-numeric:tabular-nums}
+
+  .road{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+  .phase{
+    display:grid;grid-template-columns:150px 1fr 92px;gap:12px;align-items:center;
+    background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 14px
+  }
+  .phase .pname{font-size:13px;font-weight:600}
+  .phase .pdesc{color:var(--muted);font-size:12.5px}
+  .phase .pw{font-size:12px;color:var(--muted);text-align:left;direction:ltr;font-variant-numeric:tabular-nums}
+  .phase.done{border-color:rgba(46,189,133,.4);background:rgba(46,189,133,.06)}
+  .phase.crit{border-color:rgba(229,72,77,.35)}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:right;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;letter-spacing:.3px}
+  td code{background:var(--surface2);padding:1px 6px;border-radius:5px;font-size:12px;direction:ltr;display:inline-block}
+  tr:last-child td{border-bottom:none}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .p-bad{background:rgba(229,72,77,.14);color:var(--bad)}
+  .p-warn{background:rgba(245,165,36,.14);color:var(--warn)}
+  .p-ok{background:rgba(46,189,133,.14);color:var(--ok)}
+
+  .note{
+    border:1px solid rgba(0,168,168,.3);background:rgba(0,168,168,.06);
+    border-radius:12px;padding:16px 18px;margin:18px 0
+  }
+  .note strong{color:var(--accent)}
+  .danger{border-color:rgba(229,72,77,.3);background:rgba(229,72,77,.06)}
+  .danger strong{color:var(--bad)}
+  footer{margin-top:56px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+  @media (max-width:720px){
+    .layer{grid-template-columns:1fr;gap:6px}
+    .phase{grid-template-columns:1fr;gap:4px}
+    .gap{grid-template-columns:34px 1fr 44px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand">
+    <div class="logo">T</div>
+    <div>
+      <h1>Tira Mail — الخريطة العميقة</h1>
+      <div class="sub">IFRU HOLDING · TIRA LABS · قياس 6 نوفمبر 2026 · كل رقم هنا مقيس من الكود أو من خادم يعمل، لا مقدَّر</div>
+    </div>
+  </div>
+</header>
+
+<div class="metrics">
+  <div class="metric"><div class="v">6529</div><div class="k">سطر Rust</div></div>
+  <div class="metric ok"><div class="v">87</div><div class="k">اختباراً ناجحاً</div></div>
+  <div class="metric"><div class="v">239</div><div class="k">مدخل في Cargo.lock</div></div>
+  <div class="metric"><div class="v">8</div><div class="k">crates</div></div>
+  <div class="metric ok"><div class="v">0</div><div class="k">تحذير clippy</div></div>
+  <div class="metric warn"><div class="v">115.2<span style="font-size:13px"> MiB</span></div><div class="k">حجم binary (debug)</div></div>
+  <div class="metric ok"><div class="v">1.0.2</div><div class="k">Stalwart (المحرك)</div></div>
+  <div class="metric ok"><div class="v">5</div><div class="k">منافذ محرك مُثبتة</div></div>
+  <div class="metric ok"><div class="v">2</div><div class="k">توقيعا DKIM مُتحقَّقان</div></div>
+  <div class="metric"><div class="v">24</div><div class="k">سجل DNS / نطاق</div></div>
+</div>
+
+<h2><span class="n">01</span>خريطة الطبقات</h2>
+<p>من الأعلى إلى الأسفل: ما يراه المستخدم، ثم ما يخدمه، ثم ما يحفظه. اللون يقول الحقيقة.</p>
+<div class="stack">
+  <div class="layer">
+    <div class="name">tira-frontend</div>
+    <div class="desc"><b>HTML shell</b> — escape صحيح، RTL، ثيم داكن، وواجهة وارد من الخادم. أيقونات Lucide/line-md مضمّنة بلا CDN. لا Leptos، لا WASM بعد.</div>
+    <div><span class="badge b-warn"><span class="dot d-warn"></span>HTML من الخادم</span></div>
+  </div>
+  <div class="layer">
+    <div class="name">tira-api</div>
+    <div class="desc"><b>Axum 0.8</b> — 6 مسارات: <code>/</code> (واجهة عامة ببيانات تجريبية)، <code>/healthz</code>، <code>/version</code>، قائمة رسائل JSON، رسالة خام <code>message/rfc822</code>، وصفحة <code>/mail/{id}</code>. كل ما يقرأ القاعدة محمي برمز API (Bearer أو كوكي). لا WebSocket.</div>
+    <div><span class="badge b-ok"><span class="dot d-ok"></span>محمي برموز</span></div>
+  </div>
+  <div class="layer">
+    <div class="name">tira-auth</div>
+    <div class="desc"><b>Argon2id</b> m=19456KiB t=2 p=1 · OTP 6 أرقام · TTL 5 دقائق · 5 محاولات. لا SMS، لا جلسات.</div>
+    <div><span class="badge b-ok"><span class="dot d-ok"></span>مُختبر</span></div>
+  </div>
+  <div class="layer">
+    <div class="name">tira-module</div>
+    <div class="desc"><b>Registry + TiraModule</b> — ترتيب أبجدي، عزل panic عبر <code>catch_unwind</code>. لا أحد يستدعيها بعد.</div>
+    <div><span class="badge b-ok"><span class="dot d-ok"></span>مُختبر</span></div>
+  </div>
+  <div class="layer">
+    <div class="name">tira-smtp</div>
+    <div class="desc"><b>ESMTP يدوي فوق tokio</b> — 10 MiB · 50 مستلماً · 300s. <b>RCPT يتحقق من الصندوق (550)</b>. لا STARTTLS، لا AUTH. <b>مرشح للإيقاف</b>: المحرك يغطيه.</div>
+    <div><span class="badge b-bad"><span class="dot d-bad"></span>يُستبدل</span></div>
+  </div>
+  <div class="layer">
+    <div class="name">tira-provision</div>
+    <div class="desc"><b>جسر الهوية</b> — <code>plan</code> (NDJSON idempotent) · <code>engine</code> (<code>stalwart-cli</code>) · <code>service</code> (آلة حالة + <code>--reconcile</code>). كلمة المرور تُسلَّم مرة واحدة ولا تُخزَّن.</div>
+    <div><span class="badge b-ok"><span class="dot d-ok"></span>مُثبت حياً</span></div>
+  </div>
+  <div class="layer">
+    <div class="name">Stalwart 1.0.2</div>
+    <div class="desc"><b>المحرك</b> — SMTP 25/2526 · IMAP 1143/1993 · JMAP 8443. IMAP/SMTP/JMAP مُثبتة بجلسات حقيقية، والجسر يُنشئ الحسابات من <code>tira-store</code>. يولّد DKIM (RSA-2048 + Ed25519) و<code>dnsZoneFile</code> كاملاً. شهادة ذاتية التوقيع. رخصة AGPL-3.0.</div>
+    <div><span class="badge b-ok"><span class="dot d-ok"></span>يعمل ومُوصول</span></div>
+  </div>
+  <div class="layer">
+    <div class="name">Rspamd 4.x</div>
+    <div class="desc"><b>اختياري وغير مفعّل</b> — <code>rspamd_proxy</code> · <code>self_scan</code> · مراحل <code>connect, mail, rcpt, data</code> لا <code>data</code> وحدها. الإعدادات جاهزة في <code>deploy/rspamd/</code>، والـmilter معطّل. في الإنتاج <code>tempFailOnError=true</code>.</div>
+    <div><span class="badge b-warn"><span class="dot d-warn"></span>غير مُختبر وقت التشغيل</span></div>
+  </div>
+  <div class="layer">
+    <div class="name">DNS + DMARC</div>
+    <div class="desc"><b>P3</b> — <code>dns-zone.ps1</code> يصدّر 24 سجلاً ويفحص 7 فحوص لكل نطاق، ويفك SPKI ليتأكد أن RSA ≥ 2048-bit. DMARC مرحلي: <code>none → quarantine(25%) → reject</code>. <code>dkim-proof.ps1</code> يتحقق من التوقيعين رياضياً. لا نشر عام بعد.</div>
+    <div><span class="badge b-ok"><span class="dot d-ok"></span>مُولَّد ومُتحقَّق محلياً</span></div>
+  </div>
+  <div class="layer">
+    <div class="name">tira-vault</div>
+    <div class="desc"><b>ChaCha20-Poly1305 + Argon2id</b> — <code>TIRAV1</code> للقيم و<code>TIRAS2</code> للبثّ (إطار لكل MiB، nonce جديد، ترتيب الإطار وعلم النهاية والطول الإجمالي كـAAD؛ يكشف الاقتطاع، ويقرأ <code>TIRAS1</code> القديم). at-rest فقط، ليس E2E.</div>
+    <div><span class="badge b-ok"><span class="dot d-ok"></span>مُختبر</span></div>
+  </div>
+  <div class="layer">
+    <div class="name">tira-store</div>
+    <div class="desc"><b>PostgreSQL 16 + blob store</b> — مستأجرون، نطاقات، صناديق، رسائل، تدقيق، ورموز API مُجزّأة بـSHA-256. حصة بـ <code>FOR UPDATE</code>، مفاتيح sha256، كشف تلف.</div>
+    <div><span class="badge b-ok"><span class="dot d-ok"></span>مُختبر حياً</span></div>
+  </div>
+</div>
+
+<div class="note">
+  <strong>أُثبت حياً (4–5 نوفمبر 2026):</strong> رسالة عربية دخلت على
+  <code>127.0.0.1:2526</code> → PostgreSQL + ملف sha256 → أُعيد تشغيل العملية →
+  الرسالة ما زالت موجودة. مستلم غير موجود = <code>550</code>. نفس الرسالة مرتين =
+  صفّان و<b>blob واحد</b>. تجاوز الحصة = <code>552</code>. وأُضيف في اليوم نفسه:
+  <code>/mail/{id}</code> عرض العربية بـ RTL، والرسالة الخام عادت
+  <b>119 بايتاً مطابقة</b> لما قُبل عبر SMTP.<br><br>
+  ثم على المحرك: IMAP 1143 (STARTTLS → LOGIN → APPEND 392 بايت → FETCH)،
+  IMAPS 1993، SMTP 25 بلا مصادقة، SMTP 2526 يرفض قبل AUTH ثم يقبل،
+  وJMAP 8443 جلسة مُصادَقة بـ 18 قدرة و5 مجلدات و3 رسائل — والعربية مفكوكة
+  إلى U+0600–U+06FF بلا بقايا RFC 2047.<br><br>
+  <strong>وفي 6 نوفمبر 2026:</strong> كل مسار يقرأ قاعدة البيانات صار يتطلب
+  رمزاً (<code>Authorization: Bearer</code> أو كوكي <code>tira_token</code>)؛
+  بلا رمز <code>401</code>، وعبر المستأجرين <code>404</code>، وبلا قاعدة
+  <code>503</code>. والنسخ الاحتياطي (pg_dump + blobs + manifest) نجح استرجاعه
+  مرتين: عادي ومشفَّر بـ<code>TIRAS1</code>، مع تحقق SHA-256 لكل blob.<br><br>
+  <strong>وفي P3:</strong> <code>dkim-proof.ps1</code> أثبت توقيع RSA-2048
+  وEd25519 على <code>tira.test</code> و<code>uit.ac.ma</code>، بمُحقِّق مضمّن
+  يختبر نفسه على متجهات RFC 8032 ويرفض توقيعاً مُعدَّلاً. والثابت الحرج:
+  حقل <code>DKIM-Signature</code> يُجزَّأ <b>بلا CRLF</b>، وكل حقول <code>h=</code>
+  <b>بـCRLF</b>. و<code>dns-zone.ps1</code> يصدّر 24 سجلاً ويفحص 7 فحوص،
+  و<code>milter-apply.ps1</code> يطبّق <code>MtaMilter</code> ويقرأه بـ<code>get</code>.
+</div>
+
+<div class="note danger">
+  <strong>ما لا يزال مفقوداً:</strong> المزامنة ليست مفقودة — IMAP وJMAP يعملان
+  في Stalwart. وجسر الهوية ليس مفقوداً — <code>tira-provision</code> أنشأ
+  <code>aicha@tira.test</code> من <code>tira-store</code>، وسلّمت
+  <code>youssef@uit.ac.ma</code> رسالة عابرة للنطاقات قُرئت عبر IMAP. والمصادقة
+  ليست مفقودة — الرموز تحمي كل قراءة مع قاعدة بيانات. والتوقيع ليس مفقوداً —
+  RSA وEd25519 مُتحقَّقان رياضياً. المفقود الآن <b>العالم الخارجي</b>: شهادة
+  حقيقية، نشر DNS العام وقراءة <code>p=</code> بـ<code>dig</code>، تقييم
+  Gmail/Outlook، Rspamd وقت التشغيل، تدفئة IP، RLS على مستوى القاعدة، وجدولة
+  نسخ خارج الموقع.
+</div>
+
+<h2><span class="n">02</span>خريطة الفجوات — مرتّبة بالأثر</h2>
+<p>عرض الشريط = الجهد التقديري المتبقي بمهندس واحد. الأحمر = يمنع الإطلاق. الأخضر = أُنجز.</p>
+<div class="gaps">
+  <div class="gap"><div class="id">G1</div><div class="track"><div class="fill done" style="width:100%"></div><div class="lbl">جسر الهوية + مصالحة</div></div><div class="w">✓</div></div>
+  <div class="gap"><div class="id">G7</div><div class="track"><div class="fill hot" style="width:50%"></div><div class="lbl">واجهة تفاعلية (Leptos)</div></div><div class="w">6w</div></div>
+  <div class="gap"><div class="id">G3</div><div class="track"><div class="fill mid" style="width:20%"></div><div class="lbl">نشر DKIM/DMARC + Rspamd</div></div><div class="w">2w+</div></div>
+  <div class="gap"><div class="id">G8</div><div class="track"><div class="fill mid" style="width:25%"></div><div class="lbl">بحث عربي</div></div><div class="w">3w</div></div>
+  <div class="gap"><div class="id">G11</div><div class="track"><div class="fill mid" style="width:25%"></div><div class="lbl">modules خارج العملية</div></div><div class="w">3w</div></div>
+  <div class="gap"><div class="id">G5</div><div class="track"><div class="fill done" style="width:100%"></div><div class="lbl">نسخ/استرجاع مُثبت</div></div><div class="w">✓</div></div>
+  <div class="gap"><div class="id">G9</div><div class="track"><div class="fill mid" style="width:17%"></div><div class="lbl">عزل مستأجرين RLS</div></div><div class="w">2w</div></div>
+  <div class="gap"><div class="id">G4</div><div class="track"><div class="fill mid" style="width:9%"></div><div class="lbl">شهادة إنتاج + إيقاف اليدوي</div></div><div class="w">1w</div></div>
+  <div class="gap"><div class="id">G10</div><div class="track"><div class="fill mid" style="width:9%"></div><div class="lbl">سجل تدقيق شامل</div></div><div class="w">1w</div></div>
+  <div class="gap"><div class="id">G12</div><div class="track"><div class="fill mid" style="width:9%"></div><div class="lbl">مراقبة وتنبيه</div></div><div class="w">1w</div></div>
+  <div class="gap"><div class="id">G2</div><div class="track"><div class="fill done" style="width:100%"></div><div class="lbl">تخزين دائم (وارد)</div></div><div class="w">✓</div></div>
+  <div class="gap"><div class="id">G6</div><div class="track"><div class="fill done" style="width:100%"></div><div class="lbl">تحقق المستلمين</div></div><div class="w">✓</div></div>
+  <div class="gap"><div class="id">G13</div><div class="track"><div class="fill done" style="width:100%"></div><div class="lbl">قراءة HTTP + رموز API</div></div><div class="w">✓</div></div>
+</div>
+<p style="margin-top:12px">المجموع المتبقي <b>17–26 أسبوعاً</b> بمهندس واحد — انخفض من 20–29 بعد إتمام جزء من P3 (توليد DKIM والتحقق منه، منطقة DNS، DMARC المرحلي). لا يشمل تدفئة IP (6 أسابيع تقويمية) ولا الصفقات.</p>
+
+<h2><span class="n">03</span>خريطة الطريق — 17–26 أسبوعاً متبقية مع المحرك والجسر وتوقيع DKIM جاهزين</h2>
+<p>الأسابيع تراكمية. المراحل 0 و1 و2 منجزة، وP3 منجزة محلياً (توليد وتحقق)؛ ما تبقّى نشر خارجي ثم واجهة. D1 لم يعد سؤالاً.</p>
+<div class="road">
+  <div class="phase done"><div class="pname">P0 · الأساس</div><div class="pdesc">workspace، 8 crates، 87 اختباراً، clippy نظيف</div><div class="pw">منجز</div></div>
+  <div class="phase done"><div class="pname">P1 · التخزين + قراءة</div><div class="pdesc">PostgreSQL 16.10 · blob sha256 · حصة · تدقيق · JSON/raw/HTML</div><div class="pw">منجز</div></div>
+  <div class="phase done"><div class="pname">P2 · المحرك + الجسر</div><div class="pdesc">Stalwart مُثبت · tira-provision · تسليم عابر للنطاقات · --reconcile</div><div class="pw">منجز</div></div>
+  <div class="phase"><div class="pname">P3 · التسليم</div><div class="pdesc">✅ SPF/DKIM RSA+Ed25519/DMARC مرحلي/MTA-STS · ⛔ نشر DNS · Rspamd وقت التشغيل · تدفئة IP</div><div class="pw">جزئي · W10–12</div></div>
+  <div class="phase"><div class="pname">P4 · الامتثال</div><div class="pdesc">RLS · سجل تدقيق · ملف CNDP · عقد معالجة</div><div class="pw">W13–17</div></div>
+  <div class="phase"><div class="pname">P5 · الواجهة</div><div class="pdesc">Leptos SSR · RTL · بحث عربي مُطبَّع · جوال 360px</div><div class="pw">W17–25</div></div>
+  <div class="phase"><div class="pname">P6 · Pilot</div><div class="pdesc">مؤسسة واحدة · 500 صندوق · 30 يوماً · توفر ≥ 99.5%</div><div class="pw">W25–31</div></div>
+</div>
+
+<h2><span class="n">04</span>الاقتصاد — الرقم الذي يحسم جدل التسعير</h2>
+<table>
+  <tr><th>البند</th><th>الافتراض</th><th>درهم/صندوق/شهر</th></tr>
+  <tr><td>تخزين</td><td>5 GiB × 100 درهم/TB</td><td>0.49</td></tr>
+  <tr><td>نسخ احتياطي</td><td>×2</td><td>0.49</td></tr>
+  <tr><td>حوسبة</td><td>VPS 4vCPU/8GB بـ 300 درهم يخدم ~800 صندوق</td><td>0.38</td></tr>
+  <tr><td>نقل بيانات</td><td>~2 GB/صندوق</td><td>~0.20</td></tr>
+  <tr><td><b>الإجمالي</b></td><td></td><td><b style="color:var(--ok)">~1.6</b></td></tr>
+</table>
+<div class="note">
+  <strong>الاستنتاج:</strong> التكلفة التحتية 1–3 دراهم/صندوق/شهر. النقاش بين 30 و200 درهم
+  ليس نقاش تكلفة، بل <b>تموضع</b>. بـ 30 درهماً تبيع للجميع وتبني دعماً لا يتحمّله السعر؛
+  بـ 200 درهماً تبيع لمؤسسة تحتاج فاتورة وعقداً وSLA. تكلفة الدعم 10–20× تكلفة الخادم.
+</div>
+
+<h2><span class="n">05</span>القرارات المفتوحة</h2>
+<table>
+  <tr><th>#</th><th>القرار</th><th>الموعد الأقصى</th><th>كلفة التأجيل</th></tr>
+  <tr><td><code>D1</code></td><td>المحرك: يدوي أم Stalwart أم Mailcow</td><td><span class="pill p-ok">محسوم: Stalwart 1.0.2</span></td><td>—</td></tr>
+  <tr><td><code>D2</code></td><td>الترخيص: AGPL أم dual أم تجاري</td><td><span class="pill p-bad">قبل أول عميل</span></td><td>AGPL أصبح واقعاً: تعديل المحرك يفرض نشره</td></tr>
+  <tr><td><code>D3</code></td><td>التسعير النهائي (توصية 35 / 120)</td><td><span class="pill p-warn">قبل أول عرض</span></td><td>عرض بسعر خاطئ يُثبَّت تعاقدياً</td></tr>
+  <tr><td><code>D4</code></td><td>أول عميل: خاص أم عمومي (توصية UM6P/UEMF)</td><td><span class="pill p-warn">قبل P6</span></td><td>عمومي = +6 أشهر صفقات (2-12-349)</td></tr>
+  <tr><td><code>D5</code></td><td>مكان الاستضافة</td><td><span class="pill p-warn">قبل P3</span></td><td>يحدد التزامات CNDP للنقل</td></tr>
+  <tr><td><code>D6</code></td><td>SMS gateway للـ OTP</td><td><span class="pill p-warn">قبل P4</span></td><td>Maroc Telecom / inwi / Twilio — كلها تحتاج عقداً</td></tr>
+</table>
+
+<h2><span class="n">06</span>خريطة المخاطر</h2>
+<table>
+  <tr><th>#</th><th>الخطر</th><th>الاحتمال</th><th>الأثر</th><th>التخفيف</th></tr>
+  <tr><td><code>R1</code></td><td>سمعة IP تُحرق قبل التدفئة</td><td><span class="pill p-bad">مرتفع</span></td><td>قاتل</td><td>تدفئة 30 يوماً وفق <code>P3-MAIL-AUTH-PLAN</code> (100→12,000/يوم) + مراقبة Spamhaus + شروط توقف فوري</td></tr>
+  <tr><td><code>R2</code></td><td>AGPL-3.0 على Stalwart: تعديله يفرض نشر التعديل</td><td><span class="pill p-bad">مرتفع</span></td><td>مرتفع</td><td>لا تعدّل المحرك · قرار D2 قبل أول عميل · عزل أي patch وتوثيقه</td></tr>
+  <tr><td><code>R3</code></td><td>البحث العربي رديء</td><td><span class="pill p-bad">مرتفع</span></td><td>مرتفع</td><td>مُطبِّع عربي مخصص + <code>pg_trgm</code></td></tr>
+  <tr><td><code>R4</code></td><td>مهندس واحد = bus factor 1</td><td><span class="pill p-bad">مؤكد</span></td><td>قاتل</td><td>توثيق، CI إلزامي، لا كود غير مُختبر</td></tr>
+  <tr><td><code>R5</code></td><td>تسريب بيانات = مسؤولية قانونية</td><td><span class="pill p-ok">منخفض</span></td><td>قاتل</td><td>تشفير + RLS + تدقيق + اختبار اختراق</td></tr>
+  <tr><td><code>R6</code></td><td>نقل بيانات خارج المغرب بلا ترخيص</td><td><span class="pill p-warn">متوسط</span></td><td>مرتفع</td><td>CNDP قبل أي نسخة احتياطية أجنبية</td></tr>
+  <tr><td><code>R8</code></td><td>مخزنان متساويان (PostgreSQL + Stalwart) يتباعدان</td><td><span class="pill p-bad">مرتفع</span></td><td>قاتل</td><td>حسم مالك البيانات: metadata في tira-store، رسائل في Stalwart فقط</td></tr>
+  <tr><td><code>R9</code></td><td>انحراف الهوية: حساب بلا صندوق أو صندوق بلا حساب</td><td><span class="pill p-warn">متوسط</span></td><td>مرتفع</td><td><code>provisioning</code> idempotent + <code>--reconcile</code> بأربع حالات، بلا إصلاح تلقائي، exit 2</td></tr>
+</table>
+
+<h2><span class="n">07</span>الخطوة التالية الواحدة</h2>
+<div class="note">
+  <strong>P1 أُنجز، والقراءة أُنجزت، والمحرك أُثبت، والجسر أُثبت، وتوقيع DKIM أُثبت رياضياً.</strong>
+  لم يعد السؤال «هل يوجد IMAP؟» — يوجد، ويعمل، ويقرأ العربية. ولا «كيف يُنشأ
+  حساب Stalwart من <code>tira-store</code>؟» — أُنشئ فعلاً، وسُلّمت رسالة عابرة
+  للنطاقات وقُرئت عبر IMAP. ولا «هل الرسائل موقّعة؟» — RSA-2048 وEd25519
+  يُتحققان على نطاقين.<br><br>
+  السؤال الواحد المتبقي: <b>كيف نحوّل هذا الإثبات المحلي إلى خدمة يستخدمها
+  طالب غداً دون فقدان رسالة أو انتهاك معطى شخصياً؟</b> بما أن DNS والشهادة
+  خارج متناول هذه العقدة، المسار غير المحجوب الآن هو <b>RLS + تدقيق CNDP</b>
+  (1–2 أسبوعاً): دورــان (<code>tira_owner</code> بـBYPASSRLS،
+  <code>tira_app</code> بلا BYPASSRLS)، <code>set_config('tira.tenant_id', …, true)</code>
+  داخل المعاملة، ودالتا <code>SECURITY DEFINER</code> للبحث قبل المستأجر.
+  وبالتوازي حين يتوفر DNS: نشر المنطقة بـ<code>p=none</code>، ثم التحقق من
+  المفتاح المسحوب، ثم Rspamd runtime، ثم تدفئة IP. لا Leptos قبل هذه الثلاثة.<br><br>
+  <b>الحد الذي لا يُتجاوز:</b> العزل الحالي في طبقة الاستعلام لا في القاعدة؛
+  أضف RLS قبل أول مستأجرين متعددين. الشهادة ذاتية التوقيع — لا عميل حقيقي.
+  لا تعديل على Stalwart قبل D2. ولا مخزنان للرسائل في نفس الوقت.
+  ولا <code>p=reject</code> قبل 14 يوماً من <code>p=none</code> وقراءة تقارير
+  <code>rua</code>؛ النطاق الجامعي فيه أنظمة قديمة ترسل نيابة عنه.<br><br>
+  <b>معيار نجاح P2 النهائي — تحقّق:</b> مستخدم يُنشأ بأمر واحد، فيظهر في
+  Stalwart خلال ثوانٍ، ويدخل بـ Thunderbird بكلمة المرور نفسها، ويُرسل ويستقبل
+  — ثم يُعطَّل فيختفي الوصول خلال دقيقة. لا خطوة يدوية واحدة.
+</div>
+
+<footer>
+  Tira Mail · IFRU HOLDING / TIRA LABS · الخريطة الكاملة بالنص في
+  <code>docs/DEEP_MAP.ar.md</code> · القرارات في <code>docs/DECISIONS.md</code> ·
+  التصحيحات الملزمة في <code>docs/CORRECTIONS.md</code>
+</footer>
+
+</div>
+</body>
+</html>

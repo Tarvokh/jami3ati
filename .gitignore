@@ -1,0 +1,49 @@
+# ============================================================
+# Root .gitignore for the Jami3ati + Tira Mail private repository.
+# Rule of thumb: build output, runtime data, secrets, and local
+# archives never enter the repository. Source, docs, scripts,
+# migrations, and tests do.
+# ============================================================
+
+# --- Build output and dependencies (never source) ---
+target/
+node_modules/
+dist/
+build/
+coverage/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# --- Runtime data: mail blobs, local database clusters, logs ---
+/mail.ma/data/
+/data/
+*.log
+
+# --- Secrets and local environment ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# --- Local archives and snapshots (not source) ---
+*.zip
+*.rar
+*.7z
+TiraMail_pages.rs.corrupt-backup-*
+
+# --- Scratch notes (contain demo credentials) ---
+/idea.txt
+
+# --- Report screenshots (binary dumps of earlier snapshots) ---
+/screenshot mail.ma/
+
+# --- OS noise ---
+Thumbs.db
+Desktop.ini
+.DS_Store

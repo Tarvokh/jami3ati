@@ -1,0 +1,11 @@
+# Tira Mail - allowlist map (sender domains, one per line).
+#
+# Rules for editing:
+#   * one bare domain per line, lowercase, no `@`, no wildcards;
+#   * a comment explains who asked and when (`# 2026-11-06 rectorate`);
+#   * review quarterly - an allowlist that nobody prunes becomes a bypass.
+#
+# This file is intentionally empty: adding a real institution is a policy
+# decision, not a code change.
+
+# uca.ma

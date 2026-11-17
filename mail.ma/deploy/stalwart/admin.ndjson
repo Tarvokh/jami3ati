@@ -1,0 +1,1 @@
+{"@type":"upsert","object":"Account","matchOn":["name","domainId"],"value":{"usr-admin":{"@type":"User","name":"admin","domainId":"__DOMAIN_ID__","credentials":{"0":{"@type":"Password","secret":"__ADMIN_SECRET__"}},"roles":{"@type":"Admin"},"description":"Tira provisioning service account"}}}

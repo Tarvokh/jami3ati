@@ -1,0 +1,179 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+# #28 least privilege: no job writes contents, packages or deployments, so the
+# default GITHUB_TOKEN is scoped to read-only for the whole workflow. A
+# compromised step cannot push code or mint a wider token.
+permissions:
+  contents: read
+
+# #28 one run per ref: a new push cancels the superseded run so stale commits do
+# not queue behind each other and burn runner minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Rust (fmt · clippy · test)
+    runs-on: ubuntu-latest
+    # #28 a hung dependency or test must not occupy a runner for the 6h default.
+    timeout-minutes: 30
+
+    # H-07: without a real PostgreSQL the storage/RLS/provision tests SKIP
+    # silently, so a green CI proved nothing about open-relay refusal
+    # (unknown_recipient_is_refused_at_rcpt) or tenant isolation. Provide
+    # postgres:16 and set TIRA_REQUIRE_DATABASE=1 so a missing connection is a
+    # hard failure, never a skip. PgStore::connect auto-runs the embedded
+    # migrations; migration 0004 creates the tira_app role and GRANTs it to
+    # current_user, which needs a superuser — POSTGRES_USER=postgres is one.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tira_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TIRA_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/tira_test
+      TIRA_REQUIRE_DATABASE: "1"
+
+    steps:
+      # #28 supply-chain: every action is pinned to a full commit SHA (resolved
+      # from the upstream ref), not a moving tag, so a retagged or compromised
+      # release cannot change what runs here. The trailing comment records the
+      # ref the SHA was taken from.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Pinned by SHA, so the toolchain must be named explicitly: the action's
+      # default toolchain input is github.action_ref, which is now the SHA.
+      # The version mirrors rust-toolchain.toml. The action exports
+      # RUSTUP_TOOLCHAIN, which overrides that file, so the two must be bumped
+      # together or CI would silently test a different compiler than local dev.
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: 1.99.1
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+
+      # M-020: a UTF-8 BOM (EF BB BF) corrupts the first DKIM name in a zone
+      # file and breaks strict JSON parsers. dns-zone.ps1 already writes
+      # BOM-free; this guards against a stale or hand-edited artifact
+      # reintroducing one. Fails if the artifacts are missing, so the check
+      # cannot pass vacuously.
+      - name: DNS artifacts must be BOM-free
+        run: |
+          shopt -s nullglob
+          files=(deploy/dns/*.zone deploy/dns/*.dns.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no DNS artifacts found under deploy/dns"
+            exit 1
+          fi
+          status=0
+          for f in "${files[@]}"; do
+            if [ "$(head -c 3 "$f" | od -An -tx1 | tr -d ' \n')" = "efbbbf" ]; then
+              echo "BOM detected in $f"
+              status=1
+            fi
+          done
+          if [ $status -eq 0 ]; then
+            echo "all ${#files[@]} DNS artifact(s) are BOM-free"
+          fi
+          exit $status
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace --locked
+
+  audit:
+    name: cargo audit (RustSec)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: 1.99.1
+
+      # #28 fail the build on a known-vulnerable dependency. cargo-audit checks
+      # Cargo.lock against the RustSec advisory database; a non-zero exit means
+      # an advisory matched, so a vulnerable crate cannot ship unnoticed.
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # main
+        with:
+          tool: cargo-audit
+
+      - name: Audit dependencies against RustSec
+        run: cargo audit
+
+  shell:
+    name: Shell scripts (bash -n · shellcheck)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # #28 the Rspamd installer runs as root on a mail node; a syntax error or
+      # a quoting bug there is a production outage. Gate it on both a parse
+      # check and a static lint.
+      - name: Syntax-check install.sh
+        run: bash -n deploy/rspamd/install.sh
+
+      - name: shellcheck install.sh
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y shellcheck
+          fi
+          shellcheck deploy/rspamd/install.sh
+
+  windows-scripts:
+    name: PowerShell script tests (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # #28 the backup / engine-stop / DNS / proof-hygiene guards are PowerShell
+      # and only run on Windows. They are self-contained (no PostgreSQL, no
+      # Stalwart, no network), so a clean windows runner exercises them fully.
+      # `shell: powershell` is Windows PowerShell 5.1, which these suites target
+      # (proof-hygiene uses the .NET Framework ServicePointManager policy); each
+      # script exits non-zero on any failed check, and the wrapper propagates it.
+      - name: backup-integrity
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/backup-integrity.Tests.ps1
+
+      # Execute actual backup/restore control flow with fail-closed fake native
+      # boundaries: never a production database, engine, or existing backup.
+      - name: backup-lifecycle
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy RemoteSigned -File scripts/tests/backup-lifecycle.Tests.ps1
+
+      - name: engine-backup
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/engine-backup.Tests.ps1
+
+      - name: dns-zone
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/dns-zone.Tests.ps1
+
+      - name: proof-hygiene
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/proof-hygiene.Tests.ps1

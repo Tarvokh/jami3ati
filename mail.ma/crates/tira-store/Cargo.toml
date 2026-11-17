@@ -1,0 +1,25 @@
+[package]
+name = "tira-store"
+description = "Tira Mail persistence: PostgreSQL metadata + content-addressed blob storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tira-smtp = { path = "../tira-smtp" }
+tokio.workspace = true
+tokio-postgres.workspace = true
+deadpool-postgres.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+rand.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+async-trait.workspace = true
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-postgres.workspace = true

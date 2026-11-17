@@ -1,0 +1,11 @@
+# Tira Mail - optional Redis backend for greylisting, ratelimits, Bayes and
+# fuzzy hashes.
+#
+# Rename to `redis.conf` ONLY after Redis is installed and reachable, then
+# restart Rspamd and verify with `rspamadm configtest`. Without Redis, leave
+# this file disabled: Rspamd would retry the connection on every message and
+# log a failure storm.
+servers = "127.0.0.1:6379";
+timeout = 1s;
+# db = 0;
+# password = "...";

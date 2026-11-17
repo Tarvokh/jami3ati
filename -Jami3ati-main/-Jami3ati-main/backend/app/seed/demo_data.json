@@ -1,0 +1,83 @@
+{
+  "universities": [
+    {
+      "id": "univ-um5-rabat",
+      "code": "UM5",
+      "name_ar": "جامعة محمد الخامس بالرباط",
+      "name_fr": "Université Mohammed V de Rabat",
+      "acronym": "UM5",
+      "city_ar": "الرباط",
+      "city_fr": "Rabat",
+      "region_ar": "جهة الرباط - سلا - القنيطرة",
+      "region_fr": "Région Rabat-Salé-Kénitra",
+      "established_year": 1957,
+      "website_url": "https://www.um5.ac.ma",
+      "portal_student_url": "https://ent.um5.ac.ma",
+      "description_ar": "أعرق جامعة عمومية حديثة بالمملكة المغربية، تضم كليات ومعاهد ومدارس مهندسين مرموقة.",
+      "description_fr": "Première université moderne du Maroc regroupant de prestigieux établissements d'ingénieurs et facultés.",
+      "phone": "+212 537 77 18 34",
+      "email": "contact@um5.ac.ma",
+      "source_url": "https://data.gov.ma/data/dataset/etablissements-enseignement-superieur",
+      "source_name": "بوابة البيانات المفتوحة للمملكة المغربية وموقع الجامعة",
+      "verified_at": "2026-10-18",
+      "data_status": "verified"
+    },
+    {
+      "id": "univ-uca-marrakech",
+      "code": "UCA",
+      "name_ar": "جامعة القاضي عياض بمراكش",
+      "name_fr": "Université Cadi Ayyad de Marrakech",
+      "acronym": "UCA",
+      "city_ar": "مراكش",
+      "city_fr": "Marrakech",
+      "region_ar": "جهة مراكش - آسفي",
+      "region_fr": "Région Marrakech-Safi",
+      "established_year": 1978,
+      "website_url": "https://www.uca.ma",
+      "portal_student_url": "https://ent.uca.ma",
+      "description_ar": "جامعة عمومية كبرى رائدة في مجالات العلوم الدقيقة والذكاء الاصطناعي.",
+      "description_fr": "Université publique de référence en sciences fondamentales et technologies avancées.",
+      "phone": "+212 524 43 48 13",
+      "email": "presidence@uca.ma",
+      "source_url": "https://www.enssup.gov.ma/fr/etablissements",
+      "source_name": "بوابة قطاع التعليم العالي (enssup.gov.ma)",
+      "verified_at": "2026-10-20",
+      "data_status": "verified"
+    }
+  ],
+  "institutions": [
+    {
+      "id": "inst-ensias-rabat",
+      "code": "ENSIAS",
+      "university_id": "univ-um5-rabat",
+      "name_ar": "المدرسة الوطنية العليا للمعلوميات وتحليل النظم",
+      "name_fr": "École Nationale Supérieure d'Informatique et d'Analyse des Systèmes",
+      "type": "engineering_school",
+      "type_label_ar": "مدرسة وطنية عليا للمهندسين",
+      "type_label_fr": "Grande école d'ingénieurs",
+      "city_ar": "الرباط",
+      "city_fr": "Rabat",
+      "campus_ar": "مدينة العرفان، السويسي",
+      "campus_fr": "Madinat Al Irfane, Souissi",
+      "website_url": "http://ensias.um5.ac.ma",
+      "phone": "+212 537 77 74 11",
+      "email": "contact@ensias.um5.ac.ma",
+      "source_url": "http://ensias.um5.ac.ma/etablissement/presentation",
+      "source_name": "مرسوم إحداث المؤسسة وبوابة جامعة محمد الخامس الرسمية",
+      "verified_at": "2026-10-18",
+      "data_status": "verified",
+      "programs_summary_ar": [
+        "هندسة البرمجيات والنظم الموزعة",
+        "الذكاء الاصطناعي وعلوم البيانات",
+        "الأمن السيبراني والثقة الرقمية"
+      ],
+      "programs_summary_fr": [
+        "Génie Logiciel",
+        "Intelligence Artificielle",
+        "Cybersécurité"
+      ],
+      "access_mode_ar": "المباراة الوطنية المشتركة (CNC) ولحملة الشواهد بالانتقاء والمباراة",
+      "access_mode_fr": "Concours National Commun (CNC) et concours sur titre"
+    }
+  ]
+}

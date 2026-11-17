@@ -1,0 +1,19 @@
+# Rust build output
+/target/
+
+# Runtime data: message blobs, logs, and the local PostgreSQL cluster if it
+# ever lives under the project. Never commit mail content.
+/data/
+
+# Local environment
+.env
+*.local
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# Quarantine debris — never publish or commit. Files here are temporary
+# artifacts from investigations; delete them once reviewed. This rule is a
+# second line of defence for anything left behind.
+quarantine/

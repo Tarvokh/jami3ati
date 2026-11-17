@@ -1,0 +1,11 @@
+# Tira Mail - blocklist map (sender domains, one per line).
+#
+# Rules for editing:
+#   * one bare domain per line, lowercase, no `@`, no wildcards;
+#   * record the ticket/reason next to the entry;
+#   * never block a shared provider domain (gmail.com, outlook.com, ...):
+#     that blocks every legitimate user on it.
+#
+# This file is intentionally empty.
+
+# spam-source.example   # TIR-0000

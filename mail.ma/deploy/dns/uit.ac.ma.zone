@@ -1,0 +1,27 @@
+; Tira Mail - DEMO/EXAMPLE export only. uit.ac.ma is a real-looking academic
+; domain used here solely as sample data; Tira Mail does NOT serve or control
+; it. Every host target below (MX, SRV, CNAME) points at mail.tira.test, the
+; shared local demo engine, so this is a borrowed-host demonstration, not a
+; self-hosted production zone for uit.ac.ma. Do not publish as-is.
+v1-ed25519-20261105._domainkey.uit.ac.ma. IN TXT "v=DKIM1; k=ed25519; h=sha256; p=R4vYTi7nfR491+WvHf0hIUuhqbpRZUkvMtgzpwxgxyw="
+v1-rsa-20261105._domainkey.uit.ac.ma. IN TXT (
+    "v=DKIM1; k=rsa; h=sha256; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3yL57uBB3YIx6uhn+plweB9wRn09Hl8pGFiZYzVhCkPWxzd9zMu3/ttaoqMnkqgXKjpC7HdMxFyYsZ/yIEKB1go9afkh4s0OmpGSpHyfvJmK4QnErDizYs4AZZUKY4Zg4AXSQEUHS8ytw7CrUO9v13Yrrj/67ToN0I/3wP2SYaX7ZzoMAiBgO/3"
+    "gGuY4QxZv/VLV1yPVp7iMPlRo+P82bZwtBSwstWahPQDJkNwIAYfQyZpABpgnHdAuVnspm4ZekRuDehf23hxztKO2awhin6/Fn98b9Q3AFhveu16gsU4FSvTD6NoRHwEL0JcS8WaoneY/4a7IdTfV3UBkq7h7UQIDAQAB"
+)
+uit.ac.ma. IN TXT "v=spf1 mx -all"
+uit.ac.ma. IN MX 10 mail.tira.test.
+_dmarc.uit.ac.ma. IN TXT "v=DMARC1; p=reject; rua=mailto:postmaster@uit.ac.ma"
+_caldavs._tcp.uit.ac.ma. IN SRV 0 1 443 mail.tira.test.
+_carddavs._tcp.uit.ac.ma. IN SRV 0 1 443 mail.tira.test.
+_imaps._tcp.uit.ac.ma. IN SRV 0 1 993 mail.tira.test.
+_jmap._tcp.uit.ac.ma. IN SRV 0 1 443 mail.tira.test.
+_pop3s._tcp.uit.ac.ma. IN SRV 0 1 995 mail.tira.test.
+_submissions._tcp.uit.ac.ma. IN SRV 0 1 465 mail.tira.test.
+mta-sts.uit.ac.ma. IN CNAME mail.tira.test.
+_mta-sts.uit.ac.ma. IN TXT "v=STSv1; id=17963816207469398229"
+_smtp._tls.uit.ac.ma. IN TXT "v=TLSRPTv1; rua=mailto:postmaster@uit.ac.ma"
+ua-auto-config.uit.ac.ma. IN CNAME mail.tira.test.
+_ua-auto-config.uit.ac.ma. IN TXT "v=UAAC1; a=sha256; d=5TJWw5WSzUDI4xdRS3Hl3KomN3G3+9d5XwAdnAzFyeU="
+autoconfig.uit.ac.ma. IN CNAME mail.tira.test.
+autodiscover.uit.ac.ma. IN CNAME mail.tira.test.
+

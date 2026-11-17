@@ -1,0 +1,10 @@
+[package]
+name = "tira-frontend"
+description = "Tira Mail server-rendered UI (Maud + HTMX, no WASM)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+maud = "0.27"
+chrono.workspace = true

@@ -1,0 +1,9 @@
+[package]
+name = "tira-module"
+description = "Tira Mail extension points (module trait + registry)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
