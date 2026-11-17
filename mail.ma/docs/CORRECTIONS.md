@@ -4305,3 +4305,51 @@ Ismail Benali، Elmoufid Hamza، Makhloufi Aymane، Bentatou Othman. القرا�
 - [ ] لصق رابط المستودع أو لقطة شاشة الواجهة.
 - [ ] إعادة التحقق من الأرقام يوم الإرسال.
 - [ ] الإرسال قبل **الجمعة 20 نوفمبر 2026، 16:30** بتوقيت المغرب.
+
+## 9.48 - 17 نوفمبر 2026 - تصحيح مسار Credential Helper وتثبيت حالة الـremote
+
+### 1. الخلل المقيس
+
+كُتب `credential.helper` بمسار Windows خام:
+
+```
+C:\Users\HSYSTEM\AppData\Local\Temp\opencode\gcm\gcm.exe
+```
+
+عند عملية `store` يمرّره git إلى shell، فتُبتلع الـbackslashes ويصبح
+`C:UsersHSYSTEM...gcm.exe`، ويُطبع:
+
+```
+gcm.exe store: line 1: C:UsersHSYSTEMAppDataLocalTempopencodegcmgcm.exe: command not found
+```
+
+المخزن نفسه نجح رغم الرسالة، لكن الإعداد كان هشًّا ولا يصحّ الاعتماد عليه.
+
+### 2. الإصلاح والقياس
+
+القيمة الجديدة: `!C:/Users/HSYSTEM/AppData/Local/Temp/opencode/gcm/gcm.exe`
+(شرطة مائلة أمامية، وبادئة `!` لتنفيذ shell بلا تفسير backslash).
+
+| المقياس | النتيجة |
+|---|---|
+| `credential fill` غير تفاعلي | **499 ms**، التوكن موجود، `stderr` فارغ |
+| ملف المخزن | `C:\Users\HSYSTEM\.gcm\dpapi_store\git\https\github.com\Tarvokh.credential` — **399 بايت**، 22:03:18 |
+| `cmdkey /list` | لا يعرض شيئًا — GCM يستخدم مخزنه الخاص المشفّر بـDPAPI، لا Windows Credential Manager |
+
+### 3. حالة الـremote المقيسة
+
+| المقياس | القيمة |
+|---|---|
+| `remote_main` | **`7b018d3`** (يطابق `HEAD` المحلي) |
+| عدد الملفات | **263**، `truncated=false` |
+| مسارات محظورة (`target/`، `node_modules/`، `.env`) | **0** |
+| `private` | **true** |
+
+- الـcommit الأول (لقطة النموذج): **`fa5d7c2`**.
+- الـcommit الحامل لـ§9.47: **`7b018d3`** — ملفان، **+82/−5**.
+
+### 4. ملاحظة على المتانة
+
+مسار GCM يقع داخل `%TEMP%\opencode`؛ إذا نُظّف المجلد المؤقت يلزم إعادة تفويض
+واحد عبر المتصفح. لا شيء من هذا يدخل المستودع: `.git/config` محلي وغير متعقَّب،
+ولا يُكتب أي توكن في أي ملف داخل شجرة العمل.
