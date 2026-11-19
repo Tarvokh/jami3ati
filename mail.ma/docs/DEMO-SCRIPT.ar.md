@@ -115,9 +115,11 @@ http://127.0.0.1:8000/n/<FACT_ID>
 > **قُل صراحة:** «الوزارة لا تتغيّر عند الطلب. نُظهر الاكتشاف الآن على صفحة محلية نتحكم فيها. المصدر الرسمي مسجّل أعلاه ولقطته الأولى محفوظة. هذا تدريب على الآلية، وليس ادّعاءً عن مصدر رسمي.»
 
 ```powershell
-New-Item -ItemType Directory -Force C:\temp\jami3ati-demo | Out-Null
-$utf8 = New-Object System.Text.UTF8Encoding($false)
-python -m http.server 8099 --directory C:\temp\jami3ati-demo
+# نفّذ من جذر المستودع. الصفحة تأتي من demo-fixture/ (فيها <meta charset="utf-8">).
+$work = Join-Path $env:TEMP "jami3ati-demo"
+New-Item -ItemType Directory -Force $work | Out-Null
+Copy-Item ".\-Jami3ati-main\-Jami3ati-main\demo-fixture\index.html" $work -Force
+python -m http.server 8099 --directory $work
 
 # المصدر التقني مسجَّل مسبقًا؛ اقرأ معرّفه (وسجّله إن غاب)
 $sources = Invoke-RestMethod http://127.0.0.1:8000/api/v1/sources
@@ -132,14 +134,16 @@ if (-not $srcId) {
     -Headers @{"X-Jami3ati-Admin"="demo-admin"}
 }
 
-# اكتب قيمة جديدة تختلف عن اللقطة المحفوظة ثم استقصِ → واقعة pending
-[System.IO.File]::WriteAllText("C:\temp\jami3ati-demo\index.html",
-  "<html><body><h1>إعلان</h1><p>أجل الترشيح: 20 ديسمبر 2026</p></body></html>", $utf8)
+# قدّم التاريخ خمسة أيام فقط ثم استقصِ → واقعة pending
+python ".\-Jami3ati-main\-Jami3ati-main\demo-fixture\bump_date.py" $work
 Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/sources/$srcId/poll" `
   -Headers @{"X-Jami3ati-Admin"="demo-admin"}
 ```
 
-> إن لم تظهر واقعة، فالقيمة طابقت اللقطة المحفوظة؛ اكتب تاريخًا مختلفًا واستقصِ مرة أخرى.
+> إن لم تظهر واقعة، فالقيمة طابقت اللقطة المحفوظة؛ شغّل `bump_date.py` مرة أخرى
+> (15 ← 20 ← 25 ← 30) واستقصِ. لا تكتب الصفحة يدويًا: نسيان
+> `<meta charset="utf-8">` يعرض `Ø¥Ø¹Ù„Ø§Ù†` بدل «إعلان»، وتغيير العنوان يجعل
+> الفرق سطرين.
 
 ---
 
