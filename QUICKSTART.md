@@ -92,7 +92,8 @@ cargo run -p tira-api         # http://127.0.0.1:8080
 
 > **Windows + بناء Rust من الصفر:** يحتاج C toolchain على `PATH` (MSVC Build
 > Tools أو MinGW، مثل `C:\tools\winlibs\bin`). بدونه يفشل `cc-rs` برسالة
-> `failed to find tool "gcc.exe"`. الـworkspace المبني مسبقًا لا يحتاجه.
+> `failed to find tool "gcc.exe"`. مع gcc على `PATH`، نجح
+> `cargo check --workspace` من نسخة نظيفة في 1m12s.
 
 ## ما لا يحدث تلقائيًا
 
@@ -110,4 +111,5 @@ Tira `dev.ps1 test-db` → **302 passed**, 33 targets. Tables are created on
 import. No email is sent without Tira credentials; deliveries stay `pending`
 until a human approves a fact. A fresh Windows Rust build needs a C toolchain
 on `PATH` (MSVC Build Tools or MinGW); the 302 measurement used a prebuilt
-workspace.
+workspace, and with gcc on `PATH` a clean-clone `cargo check --workspace`
+passed in 1m12s.
