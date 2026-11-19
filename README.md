@@ -104,6 +104,9 @@ institutions   ─┘        (robots.txt)               │
 
 ## التشغيل محليًا
 
+> الدليل الكامل المقيس من نسخة نظيفة — قاعدة البيانات، المتغيّرات، الاختبارات:
+> **[QUICKSTART.md](QUICKSTART.md)**.
+
 **Tira Mail** (يتطلب PostgreSQL على `127.0.0.1:55432`):
 
 ```powershell
@@ -116,8 +119,8 @@ cargo run -p tira-api          # http://127.0.0.1:8080
 **Jami3ati** (طرفان):
 
 ```powershell
-cd -Jami3ati-main/-Jami3ati-main
-npm install
+cd ".\-Jami3ati-main\-Jami3ati-main"
+npm ci
 npm run dev                    # http://127.0.0.1:3000
 
 cd backend
