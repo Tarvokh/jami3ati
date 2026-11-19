@@ -25,6 +25,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok()
         .filter(|url| !url.trim().is_empty());
 
+    // Serving real people from a database that the test suite writes into is
+    // how this process ended up showing 3,743 fixtures as if they were tenants.
+    // The guard is a name check, not a proof, but it stops the specific mistake
+    // that already happened. A deliberate QA run can still opt in.
+    if let Some(url) = database_url.as_deref() {
+        if is_test_database(url) && !allow_test_database() {
+            return Err(format!(
+                "refusing to serve from a test database: {}. \
+                 Point TIRA_DATABASE_URL at a non-test database (scripts/dev-local.ps1 creates `tira_dev`), \
+                 or set TIRA_ALLOW_TEST_DB=1 to override for a deliberate QA run.",
+                database_name(url)
+                    .as_deref()
+                    .unwrap_or("<unparsed>")
+            )
+            .into());
+        }
+    }
+
     // The proof endpoint describes where its evidence comes from. The database
     // host is reduced to a classification here so the URL (which may contain a
     // password) never enters the response.
@@ -153,4 +171,83 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn shutdown_signal() {
     let _ = tokio::signal::ctrl_c().await;
     tracing::info!("shutdown signal received");
+}
+
+/// Extracts the database name from either a URL (`postgres://u@h:5432/db?x=1`)
+/// or a key/value DSN (`host=h dbname=db`). Returns `None` when the shape is
+/// not recognised, which the caller reports instead of guessing.
+fn database_name(url: &str) -> Option<String> {
+    if let Some(rest) = url
+        .strip_prefix("postgres://")
+        .or_else(|| url.strip_prefix("postgresql://"))
+    {
+        let without_query = rest.split(['?', '#']).next().unwrap_or(rest);
+        let name = without_query.rsplit('/').next()?;
+        return (!name.is_empty()).then(|| name.to_string());
+    }
+
+    url.split_whitespace()
+        .find_map(|token| token.strip_prefix("dbname="))
+        .map(|name| name.trim_matches('\'').to_string())
+        .filter(|name| !name.is_empty())
+}
+
+/// A database is "test" when its name ends in `_test`/`_tests`. That is the
+/// convention every script and integration test in this repository uses.
+fn is_test_database(url: &str) -> bool {
+    database_name(url)
+        .map(|name| {
+            let lower = name.to_ascii_lowercase();
+            lower.ends_with("_test") || lower.ends_with("_tests")
+        })
+        .unwrap_or(false)
+}
+
+fn allow_test_database() -> bool {
+    std::env::var("TIRA_ALLOW_TEST_DB")
+        .map(|value| value == "1" || value.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{database_name, is_test_database};
+
+    #[test]
+    fn reads_the_database_name_from_a_url() {
+        assert_eq!(
+            database_name("postgres://postgres@127.0.0.1:55432/tira_dev").as_deref(),
+            Some("tira_dev")
+        );
+        assert_eq!(
+            database_name("postgresql://u:p@h:5432/tira_test?sslmode=disable").as_deref(),
+            Some("tira_test")
+        );
+    }
+
+    #[test]
+    fn reads_the_database_name_from_a_keyword_dsn() {
+        assert_eq!(
+            database_name("host=127.0.0.1 port=55432 dbname=tira_test user=postgres").as_deref(),
+            Some("tira_test")
+        );
+        assert_eq!(database_name("host=127.0.0.1 user=postgres"), None);
+    }
+
+    #[test]
+    fn flags_only_test_suffixed_databases() {
+        assert!(is_test_database(
+            "postgres://postgres@127.0.0.1:55432/tira_test"
+        ));
+        assert!(is_test_database(
+            "postgres://postgres@127.0.0.1:55432/jami3ati_tests"
+        ));
+        assert!(!is_test_database(
+            "postgres://postgres@127.0.0.1:55432/tira_dev"
+        ));
+        assert!(!is_test_database(
+            "postgres://postgres@127.0.0.1:55432/tira"
+        ));
+        assert!(!is_test_database("not a dsn"));
+    }
 }

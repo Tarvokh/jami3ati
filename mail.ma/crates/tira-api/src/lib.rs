@@ -26,10 +26,12 @@ use crate::limiter::LoginLimiter;
 
 pub mod auth;
 pub mod limiter;
+pub mod locale;
 pub mod pages;
 pub mod proof;
 pub mod read;
 pub mod send;
+pub mod signup;
 
 /// One policy for every response: no external origins, no framing, no
 /// referrer, no MIME sniffing. Inline styles and scripts are banned so the
@@ -66,9 +68,10 @@ async fn same_origin_guard(request: Request, next: Next) -> Response {
             .and_then(|value| value.to_str().ok())
             .is_some_and(|accept| accept.contains("text/html"));
         if wants_html {
+            let locale = crate::locale::resolve(request.headers(), None);
             return (
                 StatusCode::FORBIDDEN,
-                Html(tira_frontend::pages::cross_origin_rejected().into_string()),
+                Html(tira_frontend::pages::cross_origin_rejected(locale).into_string()),
             )
                 .into_response();
         }
@@ -316,7 +319,7 @@ pub fn app(state: AppState) -> Router {
         .route("/api/v1/sovereignty-proof", get(proof::control_plane_proof))
         .route_layer(middleware::from_fn(loopback_only));
 
-    Router::new()
+    let mut router = Router::new()
         .route("/", get(pages::root))
         .route("/login", get(pages::login_form).post(pages::login_submit))
         .route("/logout", post(pages::logout))
@@ -335,6 +338,7 @@ pub fn app(state: AppState) -> Router {
         .route("/assets/fonts/{file}", get(pages::asset_font))
         .route("/assets/htmx.min.js", get(pages::asset_js))
         .route("/assets/nav-a11y.js", get(pages::asset_nav_a11y))
+        .route("/assets/auth.js", get(pages::asset_auth_js))
         .route("/healthz", get(healthz))
         .route("/api/v1/version", get(version))
         .route(
@@ -354,7 +358,21 @@ pub fn app(state: AppState) -> Router {
         )
         .route("/mail/{mailbox_id}/compose", get(pages::compose_page))
         .route("/mail/{mailbox_id}/send", post(send::send))
-        .merge(proof_routes)
+        .merge(proof_routes);
+
+    // Local signup is a development door, never a product feature: it is
+    // mounted only when `TIRA_DEV_MODE=1`, and its sub-router refuses any peer
+    // that is not loopback, so a deployed or tunnelled process cannot expose it
+    // even if the flag is left on by mistake.
+    if signup::enabled() {
+        router = router.merge(
+            Router::new()
+                .route("/signup", get(signup::form).post(signup::submit))
+                .route_layer(middleware::from_fn(loopback_only)),
+        );
+    }
+
+    router
         // Guard first, headers last: the last `.layer` is the outermost one,
         // so even a 403 from the guard carries the CSP and framing policy.
         .layer(middleware::from_fn(same_origin_guard))

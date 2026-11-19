@@ -744,7 +744,7 @@ button {
   margin-inline-start: auto;
   width: 7px;
   height: 7px;
-  border-right: 1.5px solid currentColor;
+  border-inline-end: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
   transform: rotate(45deg);
   transition: transform var(--dur-2) var(--ease-out);
@@ -1081,6 +1081,10 @@ progress::-moz-progress-bar {
   max-width: 48ch;
   color: var(--muted);
   font-size: 13.5px;
+}
+
+.empty__action {
+  margin-top: 8px;
 }
 
 .list-note,
@@ -1500,17 +1504,28 @@ progress::-moz-progress-bar {
 
 /* --------------------------------------------------------------------------
    Auth screen
-   -------------------------------------------------------------------------- */
+   --------------------------------------------------------------------------
+   Two shapes share this block:
+
+   * the sign-in / sign-up shell (`.auth__shell`): one quiet card with the
+     product lockup and a language switcher above it,
+   * the failure screens (`.auth__inner`): a short explanation, then the
+     recovery action.
+
+   Neither names the database, the hash function, or the mail engine. A person
+   signing in needs an address, a password, and a way out. */
 
 .auth {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  padding: 40px 20px;
-  background: radial-gradient(760px 460px at 50% -12%, var(--accent-soft), transparent 60%),
-    var(--bg);
+  min-height: 100dvh;
+  padding: 32px 20px;
+  background: var(--bg);
 }
+
+/* --- failure screens ----------------------------------------------------- */
 
 .auth__inner {
   width: 100%;
@@ -1543,54 +1558,228 @@ progress::-moz-progress-bar {
 }
 
 .auth__title {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 600;
   line-height: 1.3;
 }
 
 .auth__lead {
   color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+/* --- sign-in / sign-up shell --------------------------------------------- */
+
+.auth__shell {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.auth__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.auth__brand-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.auth__brand-link:hover {
+  text-decoration: none;
+}
+
+.auth__bar .brand {
+  gap: 8px;
+}
+
+.auth__bar .brand__mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  font-size: 16px;
+}
+
+.auth__bar .brand__name {
   font-size: 14px;
-  line-height: 1.75;
+}
+
+.auth__bar .brand__org {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+}
+
+/* Language switcher: real links, server-side cookie, no script. */
+.lang {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.lang__item {
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--dur-1) var(--ease-out),
+    background var(--dur-1) var(--ease-out);
+}
+
+.lang__item:hover {
+  color: var(--text);
+  background: var(--surface-2);
+  text-decoration: none;
+}
+
+.lang__item--active {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--surface-2);
+}
+
+.lang__item--active:hover {
+  background: var(--surface-2);
 }
 
 .auth__card {
-  padding: 30px;
+  padding: 32px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-2);
 }
 
-.auth__card h1,
-.auth__card h2 {
-  font-size: 22px;
-  font-weight: 600;
-  margin-bottom: 6px;
+.auth__head {
+  margin-bottom: 22px;
 }
 
-.auth__card .muted {
-  font-size: 13.5px;
-  margin-bottom: 20px;
+.auth__head h1 {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
 }
+
+.auth__head .auth__lead {
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.auth__form {
+  display: block;
+}
+
+.auth__switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.auth__switch a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.auth__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 14px;
+  padding: 0 2px;
+  color: var(--faint);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.auth__foot-note {
+  text-align: end;
+}
+
+.auth__help {
+  margin-top: 16px;
+}
+
+.auth__help summary {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.auth__help summary:hover {
+  color: var(--text);
+}
+
+.auth__help p {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.auth__error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--danger) 7%, transparent);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.auth__error .i {
+  margin-top: 3px;
+  color: var(--danger);
+}
+
+/* --- fields (shared with compose and profile) ---------------------------- */
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   margin-bottom: 16px;
 }
 
 .field label {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-2);
 }
 
 .field input {
   width: 100%;
-  height: 46px;
-  padding: 0 14px;
+  height: 44px;
+  padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--bg);
@@ -1620,7 +1809,8 @@ progress::-moz-progress-bar {
 
 .field__hint {
   color: var(--faint);
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.6;
 }
 
 .field textarea {
@@ -1641,6 +1831,159 @@ progress::-moz-progress-bar {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.field__label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.field__aside {
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.field__control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field__control input {
+  padding-inline-end: 44px;
+}
+
+/* Injected by auth.js, so JavaScript-off users never meet a dead control. */
+.field__toggle {
+  position: absolute;
+  inset-inline-end: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out);
+}
+
+.field__toggle:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.field__toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The address is one left-to-right token (`name@domain`) inside a page that
+   may be RTL, so the group itself is LTR and the suffix stays glued. */
+.field__group {
+  display: flex;
+  align-items: stretch;
+  direction: ltr;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg);
+  overflow: hidden;
+  transition: border-color var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+}
+
+.field__group:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.field__group input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: start;
+}
+
+.field__group input:focus {
+  box-shadow: none;
+}
+
+.field__suffix {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0 12px;
+  border-inline-start: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.caps-warn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  color: var(--warn);
+  font-size: 11.5px;
+}
+
+.caps-warn.is-shown {
+  display: flex;
+}
+
+.field__error {
+  display: none;
+  color: var(--danger);
+  font-size: 11.5px;
+}
+
+.field__error.is-shown {
+  display: block;
+}
+
+.field input.is-invalid {
+  border-color: var(--danger);
+}
+
+@media (max-width: 480px) {
+  .auth {
+    padding: 20px 14px;
+  }
+
+  .auth__card {
+    padding: 24px 20px;
+    border-radius: var(--radius-lg);
+  }
+
+  .auth__shell {
+    gap: 16px;
+  }
+
+  .lang__item {
+    padding: 5px 7px;
+    font-size: 11px;
+  }
+}
+
+/* Short windows scroll from the top instead of clipping the card. */
+@media (max-height: 720px) {
+  .auth {
+    align-items: flex-start;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -1675,72 +2018,7 @@ progress::-moz-progress-bar {
 
 .form-actions .btn--block {
   flex: 1;
-}
-
-
-.auth__help {
-  margin-top: 14px;
-}
-
-.auth__help summary {
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  color: var(--muted);
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.auth__help p {
-  color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.75;
-}
-
-.auth__help code,
-.auth__foot code {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--text-2);
-}
-
-.auth__error {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 14px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--danger) 34%, transparent);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--danger) 7%, transparent);
-  color: var(--text);
-  font-size: 12.5px;
-  line-height: 1.65;
-}
-
-.auth__error .i {
-  margin-top: 3px;
-  color: var(--danger);
-}
-
-.auth__foot {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line-soft);
-  color: var(--faint);
-  font-size: 11.5px;
-  line-height: 1.8;
-}
-
-.auth__meta {
-  color: var(--faint);
-  font-size: 11.5px;
-  letter-spacing: 0.04em;
-  text-align: center;
-}
-
-/* --------------------------------------------------------------------------
+}/* --------------------------------------------------------------------------
    Profile
    -------------------------------------------------------------------------- */
 

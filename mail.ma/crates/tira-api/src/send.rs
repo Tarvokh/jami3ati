@@ -16,7 +16,7 @@
 //! caller that prefers a status body.
 
 use axum::extract::{Form, Path, State};
-use axum::http::{header, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Redirect, Response};
 use axum::Json;
 use chrono::{Duration as ChronoDuration, Local, Utc};
@@ -24,13 +24,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tira_frontend::{pages, MailboxModel, SentNotice};
+use tira_frontend::{format, i18n::Locale, pages, MailboxModel, SentNotice};
 use tira_smtp::client::{
     build_message, build_message_with, validate_address, MailError, SmtpClient,
 };
 use uuid::Uuid;
 
 use crate::auth::{Auth, PageAuth};
+use crate::locale;
 use crate::read::RequestMeta;
 use crate::AppState;
 use tira_store::{AuditContext, OutboundQueueEntry, StoreError};
@@ -155,9 +156,46 @@ struct SendRequest {
     body: String,
 }
 
+/// Why a composed message was refused, before any network work. Kept as a
+/// closed set rather than a string so the browser screen can render the refusal
+/// in the reader's language while the JSON surface keeps stable English copy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SendProblem {
+    RecipientRequired,
+    TooManyRecipients,
+    BodyRequired,
+    BodyTooLong,
+    InvalidMessage,
+}
+
+impl SendProblem {
+    /// English copy for non-browser callers and the JSON status body.
+    fn english(self) -> &'static str {
+        match self {
+            SendProblem::RecipientRequired => "recipient address is required",
+            SendProblem::TooManyRecipients => "too many recipients",
+            SendProblem::BodyRequired => "message body is required",
+            SendProblem::BodyTooLong => "message is longer than allowed",
+            SendProblem::InvalidMessage => "the address or message is not valid",
+        }
+    }
+
+    /// The compose screen's refusal in the requested language.
+    fn localized(self, locale: Locale) -> &'static str {
+        let text = locale.shell();
+        match self {
+            SendProblem::RecipientRequired => text.err_recipient_required,
+            SendProblem::TooManyRecipients => text.err_too_many_recipients,
+            SendProblem::BodyRequired => text.err_body_required,
+            SendProblem::BodyTooLong => text.err_body_too_long,
+            SendProblem::InvalidMessage => text.err_invalid_message,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum SendError {
-    BadRequest(&'static str),
+    BadRequest(SendProblem),
     NotFound(&'static str),
     Throttled,
     RelayMissing,
@@ -169,7 +207,9 @@ impl IntoResponse for SendError {
     fn into_response(self) -> Response {
         let throttled = matches!(self, SendError::Throttled);
         let (code, message) = match self {
-            SendError::BadRequest(message) => (StatusCode::BAD_REQUEST, message.to_string()),
+            SendError::BadRequest(problem) => {
+                (StatusCode::BAD_REQUEST, problem.english().to_string())
+            }
             SendError::NotFound(message) => (StatusCode::NOT_FOUND, message.to_string()),
             SendError::Throttled => (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -201,7 +241,7 @@ impl IntoResponse for SendError {
 
 impl From<MailError> for SendError {
     fn from(_err: MailError) -> Self {
-        SendError::BadRequest("البريد الإلكتروني أو الرسالة غير صالحة")
+        SendError::BadRequest(SendProblem::InvalidMessage)
     }
 }
 
@@ -212,12 +252,12 @@ impl From<StoreError> for SendError {
 }
 
 /// Validates a composed send. Pure so the boundaries are unit-testable
-/// without a transport or a database. Error copy is Arabic because the refusal
-/// is shown on the Arabic compose screen.
+/// without a transport or a database. The refusal is a [`SendProblem`] so the
+/// compose screen can localize it.
 fn validate(form: &SendForm) -> Result<SendRequest, SendError> {
     let to = form.to.trim();
     if to.is_empty() {
-        return Err(SendError::BadRequest("البريد الإلكتروني مطلوب."));
+        return Err(SendError::BadRequest(SendProblem::RecipientRequired));
     }
     let recipients: Vec<String> = to
         .split(',')
@@ -226,18 +266,18 @@ fn validate(form: &SendForm) -> Result<SendRequest, SendError> {
         .map(|value| value.to_ascii_lowercase())
         .collect();
     if recipients.is_empty() {
-        return Err(SendError::BadRequest("البريد الإلكتروني مطلوب."));
+        return Err(SendError::BadRequest(SendProblem::RecipientRequired));
     }
     if recipients.len() > SEND_MAX_RECIPIENTS {
-        return Err(SendError::BadRequest("عدد المستلمين أكبر من المسموح."));
+        return Err(SendError::BadRequest(SendProblem::TooManyRecipients));
     }
 
     let body = form.body.trim();
     if body.is_empty() {
-        return Err(SendError::BadRequest("جسم الرسالة مطلوب."));
+        return Err(SendError::BadRequest(SendProblem::BodyRequired));
     }
     if body.len() > SEND_MAX_BODY_BYTES {
-        return Err(SendError::BadRequest("الرسالة أطول من المسموح."));
+        return Err(SendError::BadRequest(SendProblem::BodyTooLong));
     }
 
     let subject = form
@@ -254,31 +294,31 @@ fn validate(form: &SendForm) -> Result<SendRequest, SendError> {
     })
 }
 
-/// Arabic refusal copy for the browser-facing compose screen. The JSON status
-/// bodies keep their own honest English/Arabic strings via [`SendError`].
-fn compose_error(err: &SendError) -> String {
+/// Localized refusal copy for the browser-facing compose screen. The JSON
+/// status bodies keep their own stable English strings via [`SendError`].
+fn compose_error(locale: Locale, err: &SendError) -> String {
+    let text = locale.shell();
     match err {
-        SendError::BadRequest(message) => (*message).to_string(),
-        SendError::Throttled => "محاولات كثيرة. انتظر قبل إعادة المحاولة.".to_string(),
-        SendError::Upstream(_) => "تعذّر الإرسال عبر مسار SMTP. حاول مرة أخرى.".to_string(),
-        SendError::RelayMissing => "مسار الإرسال غير مهيّأ بعد.".to_string(),
-        SendError::NotFound(_) | SendError::Unavailable(_) => {
-            "تعذّر معالجة الطلب. حاول مرة أخرى.".to_string()
-        }
+        SendError::BadRequest(problem) => problem.localized(locale).to_string(),
+        SendError::Throttled => text.err_throttled.to_string(),
+        SendError::Upstream(_) => text.err_upstream.to_string(),
+        SendError::RelayMissing => text.err_relay_missing.to_string(),
+        SendError::NotFound(_) | SendError::Unavailable(_) => text.err_generic.to_string(),
     }
 }
 
 fn compose_screen(
+    locale: Locale,
     mailbox: &MailboxModel,
     to: &str,
     subject: &str,
     body: &str,
     err: &SendError,
 ) -> Response {
-    let error = compose_error(err);
+    let error = compose_error(locale, err);
     crate::pages::html(
         StatusCode::OK,
-        pages::compose(mailbox, to, subject, body, Some(&error)),
+        pages::compose(locale, mailbox, to, subject, body, Some(&error)),
     )
 }
 
@@ -895,11 +935,13 @@ pub async fn send(
     State(state): State<AppState>,
     auth: PageAuth,
     meta: RequestMeta,
+    headers: HeaderMap,
     Path(mailbox_id): Path<String>,
     Form(form): Form<SendForm>,
 ) -> Response {
+    let locale = locale::resolve(&headers, None);
     let Some(store) = state.store.as_ref() else {
-        return crate::pages::service_unavailable_response("no database configured");
+        return crate::pages::service_unavailable_response(locale, "no database configured");
     };
 
     let mailbox_id = match Uuid::parse_str(&mailbox_id) {
@@ -907,9 +949,8 @@ pub async fn send(
         Err(_) => {
             return crate::pages::problem(
                 StatusCode::BAD_REQUEST,
-                "بيانات غير صالحة",
-                "هذا الطلب لا يحتوي على معرّف صندوق صالح.",
-                "المعرّف المطلوب ناقص أو غير صالح، لذلك لا يمكن الإنشاء.",
+                locale,
+                crate::pages::ProblemKind::BadComposeRequest,
             );
         }
     };
@@ -920,9 +961,8 @@ pub async fn send(
     if auth.0.mailbox_id != Some(mailbox_id) {
         return crate::pages::problem(
             StatusCode::NOT_FOUND,
-            "غير موجود",
-            "لا يوجد صندوق بهذا المعرّف.",
-            "قد يكون المعرّف خاطئًا أو تابعًا لمستأجر آخر. الردّ واحد في الحالتين حتى لا يمكن تخمين المعرّفات.",
+            locale,
+            crate::pages::ProblemKind::MissingMailbox,
         );
     }
 
@@ -942,14 +982,13 @@ pub async fn send(
         Ok(None) => {
             return crate::pages::problem(
                 StatusCode::NOT_FOUND,
-                "غير موجود",
-                "لا يوجد صندوق بهذا المعرّف.",
-                "قد يكون المعرّف خاطئًا أو تابعًا لمستأجر آخر. الردّ واحد في الحالتين حتى لا يمكن تخمين المعرّفات.",
+                locale,
+                crate::pages::ProblemKind::MissingMailbox,
             );
         }
         Err(err) => {
             tracing::warn!(%err, "send path mailbox read failed");
-            return crate::pages::service_unavailable_response("storage unavailable");
+            return crate::pages::service_unavailable_response(locale, "storage unavailable");
         }
     };
 
@@ -974,7 +1013,7 @@ pub async fn send(
                 .unwrap_or("")
                 .to_string();
             let body = form.body.trim().to_string();
-            return compose_screen(&mailbox, &to, &subject, &body, &err);
+            return compose_screen(locale, &mailbox, &to, &subject, &body, &err);
         }
     };
 
@@ -987,18 +1026,35 @@ pub async fn send(
         .login_limiter
         .try_attempt_capped(&limiter_key, SEND_MAX_PER_WINDOW)
     {
-        return compose_screen(&mailbox, &to, &subject, &body, &SendError::Throttled);
+        return compose_screen(
+            locale,
+            &mailbox,
+            &to,
+            &subject,
+            &body,
+            &SendError::Throttled,
+        );
     }
 
     let relay = match state.smtp_relay.as_ref() {
         Some(relay) => relay,
-        None => return compose_screen(&mailbox, &to, &subject, &body, &SendError::RelayMissing),
+        None => {
+            return compose_screen(
+                locale,
+                &mailbox,
+                &to,
+                &subject,
+                &body,
+                &SendError::RelayMissing,
+            )
+        }
     };
     let client = if relay.starttls {
         match SmtpClient::starttls(&relay.host, relay.port, &relay.username, &relay.password) {
             Ok(client) => client,
             Err(err) => {
                 return compose_screen(
+                    locale,
                     &mailbox,
                     &to,
                     &subject,
@@ -1012,6 +1068,7 @@ pub async fn send(
             Ok(client) => client,
             Err(err) => {
                 return compose_screen(
+                    locale,
                     &mailbox,
                     &to,
                     &subject,
@@ -1033,11 +1090,12 @@ pub async fn send(
         Err(err) => {
             tracing::warn!(%err, "compose failed: invalid address or message");
             return compose_screen(
+                locale,
                 &mailbox,
                 &to,
                 &subject,
                 &body,
-                &SendError::BadRequest("البريد الإلكتروني أو الرسالة غير صالحة"),
+                &SendError::BadRequest(SendProblem::InvalidMessage),
             );
         }
     };
@@ -1074,6 +1132,7 @@ pub async fn send(
             tracing::warn!(%audit_err, "send audit write failed");
         }
         return compose_screen(
+            locale,
             &mailbox,
             &to,
             &subject,
@@ -1106,7 +1165,8 @@ pub async fn send(
         SentNotice {
             to: to.clone(),
             subject: subject.clone(),
-            accepted_at: tira_frontend::format::full_stamp(
+            accepted_at: format::full_stamp(
+                locale,
                 Utc::now().with_timezone(&Local).fixed_offset(),
             ),
             relay: format!("{}:{}", relay.host, relay.port),
@@ -1192,7 +1252,7 @@ mod tests {
     fn rejects_an_empty_recipient() {
         assert!(matches!(
             validate(&form("   ", None, "hello")),
-            Err(SendError::BadRequest("البريد الإلكتروني مطلوب."))
+            Err(SendError::BadRequest(SendProblem::RecipientRequired))
         ));
     }
 
@@ -1200,7 +1260,7 @@ mod tests {
     fn rejects_an_empty_body() {
         assert!(matches!(
             validate(&form("aicha@uca.ma", None, "   ")),
-            Err(SendError::BadRequest("جسم الرسالة مطلوب."))
+            Err(SendError::BadRequest(SendProblem::BodyRequired))
         ));
     }
 
@@ -1209,7 +1269,7 @@ mod tests {
         let long = "x".repeat(SEND_MAX_BODY_BYTES + 1);
         assert!(matches!(
             validate(&form("aicha@uca.ma", None, &long)),
-            Err(SendError::BadRequest("الرسالة أطول من المسموح."))
+            Err(SendError::BadRequest(SendProblem::BodyTooLong))
         ));
     }
 
@@ -1221,7 +1281,7 @@ mod tests {
             .join(",");
         assert!(matches!(
             validate(&form(&many, None, "hello")),
-            Err(SendError::BadRequest("عدد المستلمين أكبر من المسموح."))
+            Err(SendError::BadRequest(SendProblem::TooManyRecipients))
         ));
     }
 
@@ -1246,7 +1306,7 @@ mod tests {
 
     #[test]
     fn bad_request_answers_400() {
-        let response = SendError::BadRequest("البريد الإلكتروني مطلوب.").into_response();
+        let response = SendError::BadRequest(SendProblem::RecipientRequired).into_response();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 

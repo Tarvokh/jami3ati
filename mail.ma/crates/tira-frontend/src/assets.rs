@@ -18,6 +18,13 @@ pub const HTMX_JS: &str = include_str!("../assets/htmx.min.js");
 /// JavaScript disabled there are no boosted swaps to enhance. No CDN, ever.
 pub const NAV_A11Y_JS: &str = include_str!("../assets/nav-a11y.js");
 
+/// Auth-screen enhancer: password reveal, live address preview, a strength
+/// meter, a confirm-mismatch hint and a Caps Lock warning. Progressive — the
+/// forms submit and validate without it, and the toggle button only exists
+/// once the script has injected it, so JavaScript-off users never see a dead
+/// control. Self-hosted: no CDN, ever.
+pub const AUTH_JS: &str = include_str!("../assets/auth.js");
+
 /// One embedded webfont file.
 ///
 /// The files are the Arabic and Latin subsets of IBM Plex Sans Arabic 4.0
@@ -100,6 +107,11 @@ pub const HTMX_ETAG: &str = "\"htmx-2.0.4\"";
 pub static NAV_A11Y_ETAG: std::sync::LazyLock<String> =
     std::sync::LazyLock::new(|| format!("\"nav-a11y-{:016x}\"", fnv1a(NAV_A11Y_JS.as_bytes())));
 
+/// Content-derived like the other self-hosted assets, so an edit busts the
+/// browser cache instead of leaving the previous auth behaviour in place.
+pub static AUTH_ETAG: std::sync::LazyLock<String> =
+    std::sync::LazyLock::new(|| format!("\"auth-{:016x}\"", fnv1a(AUTH_JS.as_bytes())));
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +163,21 @@ mod tests {
         assert!(NAV_A11Y_JS.contains("htmx:beforeRequest"));
         assert!(NAV_A11Y_JS.contains("htmx:afterSettle"));
         assert!(NAV_A11Y_ETAG.starts_with("\"nav-a11y-"));
+    }
+
+    #[test]
+    fn auth_enhancer_is_embedded_and_self_hosted() {
+        assert!(!AUTH_JS.is_empty());
+        // Self-hosted: it never references an external resource. The SVGs it
+        // injects are written without an xmlns, which keeps this assertion
+        // meaningful instead of exempting the file from it.
+        assert!(!AUTH_JS.contains("https://"));
+        assert!(!AUTH_JS.contains("http://"));
+        // It only wires up the controls the auth pages actually render.
+        assert!(AUTH_JS.contains("field__toggle"));
+        assert!(AUTH_JS.contains("data-reveal-show"));
+        assert!(AUTH_JS.contains("data-pw-confirm"));
+        assert!(AUTH_JS.contains("CapsLock"));
+        assert!(AUTH_ETAG.starts_with("\"auth-"));
     }
 }

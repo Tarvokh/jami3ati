@@ -98,7 +98,7 @@ $env:STALWART_ADMIN_PASSWORD    = "..."
 .\scripts\pg-dev.ps1        # PostgreSQL محمول على 127.0.0.1:55432
 .\scripts\dev.ps1 check     # cargo check --workspace --all-targets
 .\scripts\dev.ps1 test      # كل الاختبارات (اختبارات القاعدة تُتخطّى بلا اتصال)
-.\scripts\dev.ps1 test-db   # 276 اختباراً، مع رفض التخطي
+.\scripts\dev.ps1 test-db   # 302 اختباراً، مع رفض التخطي
 .\scripts\dev.ps1 clippy    # clippy مع -D warnings
 .\scripts\dev.ps1 run       # tira-api على http://127.0.0.1:8080
 ```
@@ -110,6 +110,25 @@ $env:STALWART_ADMIN_PASSWORD    = "..."
 `tira-api/tests/session.rs` (3)، `tira-api/tests/outbound.rs` (8)،
 و`tira-provision/tests/bridge.rs` (8).
 الباقي اختبارات وحدة بلا شبكة ولا قاعدة بيانات.
+
+### تشغيل محلي لمستخدمين حقيقيين (تسجيل ذاتي)
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev-local.ps1
+# Sign up:  http://127.0.0.1:8080/signup
+```
+
+أمر واحد يشغّل PostgreSQL، وينشئ قاعدة `tira_dev` النظيفة، ويطبّق migrations،
+وينشئ المستأجر والنطاق `tira.test` مرة واحدة، ثم يشغّل `tira-api` مع
+`TIRA_DEV_MODE=1` و`tira-smtp` على loopback. كل تسجيل ينشئ صندوقًا حقيقيًا
+(Argon2id + جلسة + سجل تدقيق) بصندوق وارد فارغ، وزر «أرسل رسالة إلى نفسك»
+يمرّ عبر SMTP حقيقي. لا بيانات نموذجية.
+
+- `tira_test` تبقى كما هي للاختبارات والعرض القديم؛ التوكن التجريبي لم يُبطَل.
+- الـ API يرفض الإقلاع من قاعدة ينتهي اسمها بـ `_test`/`_tests` إلا مع
+  `TIRA_ALLOW_TEST_DB=1`، لأن ذلك هو سبب ظهور آلاف المستأجرين المزيّفين سابقًا.
+- التفاصيل الكاملة، وإعادة الضبط، والأعطال الشائعة:
+  [`docs/LOCAL-TESTING.md`](docs/LOCAL-TESTING.md).
 
 ### جسر الهوية
 
@@ -140,18 +159,24 @@ $env:TIRA_PROVISION_PASSWORD = "..."   # أو اكتبها عند الطلب
 تشغيل مع التخزين:
 
 ```powershell
-$env:TIRA_DATABASE_URL = "postgres://postgres@127.0.0.1:55432/tira_test"
-$env:TIRA_BLOB_ROOT    = ".\data\blobs"
-$env:TIRA_SMTP_ADDR    = "127.0.0.1:2526"
+# الطريق الموصى به: سكربت واحد يضبط كل شيء (قاعدة tira_dev، وضع التطوير، SMTP محلي)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev-local.ps1
+
+# أو يدويًا، بقاعدة غير اختبارية (الـ API يرفض أي *_test):
+$env:TIRA_DATABASE_URL = "postgres://postgres@127.0.0.1:55432/tira_dev"
+$env:TIRA_BLOB_ROOT    = ".\data\blobs-dev"
+$env:TIRA_BIND         = "127.0.0.1:8080"
 .\target\debug\tira-api.exe
-# ثم: http://127.0.0.1:8081/healthz  ->  {"status":"ok","database":"ok"}
+# ثم: http://127.0.0.1:8080/healthz  ->  {"status":"ok","database":"ok"}
 ```
 
 ### مسارات القراءة (محمية برمز API)
 
 ```
-GET /                                                صفحة عرض عامة (بيانات تجريبية)
-GET /mail/{mailbox_id}                              صفحة HTML عربية RTL — تتطلب رمزاً
+GET /                                                جلسة صالحة → 303 إلى صندوقها، وإلا صفحة الدخول
+GET /login                                          صفحة الدخول (HTML)
+GET /signup                                         إنشاء صندوق — TIRA_DEV_MODE=1 + loopback فقط
+GET /mail/{mailbox_id}                              صفحة HTML عربية RTL — تتطلب جلسة
 GET /api/v1/mailboxes/{mailbox_id}/messages         JSON + limit/offset + total — رمز
 GET /api/v1/messages/{message_id}/raw               بايتات RFC 5322 كما قُبلت — رمز
 ```
@@ -170,27 +195,27 @@ HTML. **لا تُقبل الرموز في سلسلة الاستعلام** (تس�
 إصدار رمز لصندوق واحد (يُطبع النص مرة واحدة فقط؛ القاعدة تحفظ SHA-256):
 
 ```powershell
-$env:TIRA_DATABASE_URL = "postgres://postgres@127.0.0.1:55432/tira_test"
-.\target\debug\tira-token.exe --tenant 11111111-1111-4111-8111-111111111111 `
-    --mailbox 44444444-4444-4444-8444-444444444444 --label "pilot-aicha" --ttl-days 90
-.\target\debug\tira-token.exe --tenant 11111111-1111-4111-8111-111111111111 --list
+$env:TIRA_DATABASE_URL = "postgres://postgres@127.0.0.1:55432/tira_dev"
+.\target\debug\tira-token.exe --tenant 7a1e0000-0000-4000-8000-000000000001 `
+    --mailbox <mailbox-id> --label "pilot-local" --ttl-days 90
+.\target\debug\tira-token.exe --tenant 7a1e0000-0000-4000-8000-000000000001 --list
 .\target\debug\tira-token.exe --revoke <token-id>
 ```
 
-> `GET /` نفسه يبقى عاماً ويعرض بيانات تجريبية ثابتة، تماماً كما يُختبر في
-> `crates/tira-api/tests/health.rs`. لا تعتبره تسريباً: لا يقرأ القاعدة.
-> الربط على `0.0.0.0` مسموح الآن من ناحية المصادقة، لكنه يبقى خلف TLS reverse
-> proxy في الإنتاج.
+> `GET /` عام بمعنى أنه لا يتطلب رمزًا، لكنه **لا يعرض بيانات**: يوجّه الجلسة
+> الصالحة إلى صندوقها، ويعيد صفحة الدخول لكل زائر آخر. لا صندوق نموذجي ولا
+> عدّاد ثابت. الربط على `0.0.0.0` مسموح من ناحية المصادقة، لكنه يبقى خلف TLS
+> reverse proxy في الإنتاج.
 
-الواجهة الحالية ليست صورة ولا mockup: `GET /` يبني نفس HTML الذي يُختبر في
-`crates/tira-api/tests/health.rs`. الأيقونات مضمّنة في
+الواجهة الحالية ليست صورة ولا mockup: `GET /mail/{id}` و`GET /login` يبنيان
+HTML من مخزن PostgreSQL الحقيقي، والأيقونات مضمّنة في
 `crates/tira-frontend/src/icons.rs` (Lucide ثابتة + line-md متحركة، بلا CDN)؛
 القواعد والرخص في [`docs/ICONS.md`](docs/ICONS.md).
 
 ```powershell
-$env:TIRA_BIND = "127.0.0.1:8090"   # 8080 مشغول بـ Stalwart محلياً
+$env:TIRA_BIND = "127.0.0.1:8090"   # منفذ بديل إن كان 8080 مستخدمًا على جهازك
 .\target\debug\tira-api.exe
-# افتح http://127.0.0.1:8090/
+# افتح http://127.0.0.1:8090/  (صفحة الدخول؛ بلا قاعدة بيانات لا يوجد تسجيل)
 ```
 
 > **Smart App Control على جهاز التطوير:** بعد تحوّله إلى وضع الفرض، يُرفض أي
@@ -354,7 +379,7 @@ cargo test --workspace
 | التنسيق | `cargo fmt --all -- --check` | ✅ exit `0` |
 | clippy | `cargo clippy --workspace --all-targets -- -D warnings` | ✅ 0 تحذير |
 | البناء | `cargo check --workspace --all-targets` | ✅ exit `0` |
-| الاختبارات | `.\scripts\dev.ps1 test-db` (`TIRA_REQUIRE_DATABASE=1`) | ✅ **276/276** (56 على PostgreSQL)، 0 failed، 0 ignored، 33 هدفًا، exit `0` |
+| الاختبارات | `.\scripts\dev.ps1 test-db` (`TIRA_REQUIRE_DATABASE=1`) | ✅ **283/283** (56 على PostgreSQL)، 0 failed، 0 ignored، 33 هدفًا، exit `0` |
 | العقد | `cargo test -p tira-api --test outbound` | ✅ **8/8** على PostgreSQL حقيقي |
 
 الفرق عن 15 نوفمبر: **+20 اختبارًا** (8 تحقق وحدات في `send.rs`، 4 ترويسات في
@@ -376,6 +401,52 @@ cargo test --workspace
 > و**24** مسار HTTP، و**8** crates. الاختبارات الخمسة الجديدة: 3 في
 > `tira-frontend` (لافتة الإرسال، سطر التذييل الصادق، تسمية سجلات النطاق)، و2 في
 > `tira-api` (ربط الإشعار بالصندوق، وسقف المخزن). الفقرة أعلاه تبقى سجلًّا مؤرَّخًا.
+
+> **تحديث (17 نوفمبر، بعد §9.50):** أُضيف تشغيل محلي لمستخدمين حقيقيين:
+> `/signup` في وضع التطوير، حاجز رفض قواعد `*_test`، وزر «أرسل رسالة إلى نفسك».
+> القياس: **281** اختبارًا في 33 هدفًا (كان 276)، منها **56** على PostgreSQL
+> (بلا تغيير). الخمسة الجديدة: 2 وحدة في `signup.rs` و3 وحدة في `main.rs`.
+> الأرقام في §9.46 أعلاه تبقى كما قيست يومها.
+
+> **تحديث (17 نوفمبر، بعد §9.51):** أُعيد تصميم شاشتَي الدخول والتسجيل
+> كواجهة منتج حقيقي لا كنموذج: عمودان (نموذج على جهة البداية، ولوحة تعريف على
+> الجهة الأخرى)، وحقول مجمَّعة (`field__group`) للعنوان، وكشف كلمة المرور،
+> ومؤشر قوة استشاري، وتنبيه Caps Lock — كلها تحسينات تدريجية في
+> `/assets/auth.js`، فلا زر ميت بلا JavaScript. القياس: **283** اختبارًا في 33
+> هدفًا (كان 281)، منها **56** على PostgreSQL (بلا تغيير). الاختباران
+> الجديدان: `layout::tests::auth_pages_load_the_enhancer_and_other_pages_do_not`
+> و`assets::tests::auth_enhancer_is_embedded_and_self_hosted`. أرقام §9.50
+> أعلاه تبقى كما قيست يومها.
+
+> **تحديث (18 نوفمبر، بعد §9.52):** شاشتا الدخول والتسجيل صارتا **بثلاث لغات**
+> (عربي/فرنسي/إنجليزي) بمصدر نصوص واحد (`tira-frontend/src/i18n.rs`، 49 حقلًا ×
+> 3 لغات)، وتبديل اللغة روابط عادية تعمل بلا JavaScript ويُحفظ في كوكي
+> `tira_lang`. التخطيط عاد إلى **بطاقة واحدة موسّطة** تتّسع للشاشة
+> (`min-height: 100dvh` + نقطة `max-height: 720px`)، وحُذف مؤشر قوة كلمة المرور
+> ومعاينة العنوان. ونُظّفت صفحات المنتج من كل اسم بنية تحتية: لا PostgreSQL ولا
+> Argon2id ولا RLS ولا Stalwart ولا IMAP/SMTP ولا UUID ولا «مستأجر» في أي صفحة
+> يراها المستخدم. القياس: **291** اختبارًا في 33 هدفًا (كان 283)، منها **56**
+> على PostgreSQL (بلا تغيير). الثمانية الجديدة: 3 في `i18n.rs`، و3 في
+> `tira-api/src/locale.rs`، و1 في `layout.rs`، و1 في `pages.rs` (الواجهة).
+> أرقام §9.51 أعلاه تصف التخطيط المستبدَل وتبقى كما قيست يومها.
+
+> **تحديث (19 نوفمبر، بعد §9.54):** اكتملت الترجمة على **قشرة صندوق البريد
+> كلها** لا على شاشات المصادقة وحدها: الوارد والقارئ والتحرير والملف الشخصي
+> وصفحات الفشل (400/404/503) والنسخة المطبوعة، بثلاث لغات (عربي/فرنسي/إنجليزي)
+> من الجدول نفسه في `i18n.rs` (`ShellText`، 179 حقلًا × 3). تبديل اللغة روابط
+> نسبية `?lang=fr` تحفظ المسار الحالي وتعمل بلا JavaScript، ويُثبَّت في كوكي
+> `tira_lang`. تُرجمت واجهة الرسالة فقط: الموضوع والمرسل والنص تبقى كما وردت،
+> و`dir="auto"` عليها، و`dir="ltr"` على العناوين والمعرّفات. صيغ الجمع تُحسب
+> لكل لغة (ستٌّ في العربية، اثنتان في الفرنسية والإنجليزية)، والتواريخ والأحجام
+> تُنسَّق حسب اللغة. وأُصلح آخر خاصيتين فيزيائيتين في CSS
+> (`border-right` → `border-inline-end`، و`text-align: left` → `text-align: start`)،
+> فصار عدد الخصائص الفيزيائية **0**. القياس: **302** اختبارًا في 33 هدفًا (كان
+> 291)، منها **56** على PostgreSQL (بلا تغيير). الأحد عشر الجديدة: 5 في
+> `i18n.rs` (اكتمال جدول القشرة، صيغ الجمع الست والاثنتان، ترجمة الحالات
+> والمحرّك، خلوّ النصوص من المصطلحات الداخلية)، و1 في `format.rs` (تنسيق
+> الطوابع حسب اللغة)، و5 في `components.rs` (روابط التبديل النسبية، قشرة
+> فرنسية وإنجليزية، `dir="auto"` على المحتوى، وخلوّ الملف الشخصي من المصطلحات
+> في كل لغة). أرقام §9.52 أعلاه تبقى كما قيست يومها.
 
 ## ما لا يعمل بعد
 

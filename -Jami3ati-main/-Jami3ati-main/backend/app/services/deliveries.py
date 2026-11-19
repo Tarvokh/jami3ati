@@ -66,8 +66,8 @@ def render_confirmation(
     subject = "تأكيد الاشتراك في تنبيهات مرصد جامعتي"
     body = (
         "مرحبًا،\n\n"
-        "طلبت الاشتراك في تنبيهات «مرصد جامعتي» — تنبيهات مبنية على مصادر رسمية "
-        "قابلة للتحقق.\n\n"
+        "طلبت الاشتراك في تنبيهات «مرصد جامعتي» — تنبيهات مبنية على صفحات مصادر "
+        "مسجَّلة قابلة للتحقق.\n\n"
         "لتأكيد الاشتراك، افتح هذا الرابط:\n"
         f"{link}\n\n"
         f"الرابط صالح حتى {_fmt_utc(subscription.confirm_expires_at)}.\n"
@@ -90,7 +90,7 @@ def render_notification(
     body = (
         f"{notification.title_ar}\n\n"
         f"{notification.body_ar}\n\n"
-        f"المصدر الرسمي: {notification.source_url}\n"
+        f"صفحة المصدر: {notification.source_url}\n"
         f"تاريخ التحقق من المصدر: {verified}\n\n"
         "أنت تتلقى هذه الرسالة لأنك أكّدت اشتراكك في تنبيهات مرصد جامعتي.\n"
         f"لإلغاء الاشتراك: {unsubscribe}\n\n"

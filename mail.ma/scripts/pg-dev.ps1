@@ -98,6 +98,13 @@ if ("$exists".Trim() -ne "1") {
 $url = "postgres://postgres@127.0.0.1:$Port/$Db"
 Write-Host ""
 Write-Host "PostgreSQL ready: $url" -ForegroundColor Green
-Write-Host "Run the storage tests with:" -ForegroundColor Gray
-Write-Host "  `$env:TIRA_TEST_DATABASE_URL = `"$url`"" -ForegroundColor Gray
-Write-Host "  cargo test -p tira-store --test persist" -ForegroundColor Gray
+if ($Db -match "_tests?$") {
+    Write-Host "Run the storage tests with:" -ForegroundColor Gray
+    Write-Host "  `$env:TIRA_TEST_DATABASE_URL = `"$url`"" -ForegroundColor Gray
+    Write-Host "  cargo test -p tira-store --test persist" -ForegroundColor Gray
+} else {
+    # Do not suggest pointing the test suite here: it writes thousands of
+    # fixtures, and tira-api refuses to serve from a *_test database precisely
+    # to keep those two uses apart.
+    Write-Host "This is not a test database; use it for the app, not for TIRA_TEST_DATABASE_URL." -ForegroundColor Gray
+}

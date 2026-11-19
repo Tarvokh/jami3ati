@@ -22,6 +22,7 @@
 pub mod assets;
 pub mod components;
 pub mod format;
+pub mod i18n;
 pub mod icons;
 pub mod layout;
 pub mod pages;
@@ -30,6 +31,7 @@ pub use components::{
     CheckView, InboxModel, MailboxModel, MessageAuth, MessageModel, ProfileModel, ReadingMessage,
     ReadingModel, SentNotice, SessionModel,
 };
+pub use i18n::Locale;
 pub use maud::Markup;
 
 pub const PRODUCT: &str = "Tira Mail";
@@ -48,13 +50,16 @@ pub fn asset_scan_target() -> String {
         quota_bytes: 1,
     };
 
-    let mut out = pages::login(None).into_string();
+    let mut out = pages::login(Locale::Ar, None).into_string();
     out.push_str(
-        &pages::inbox(&InboxModel {
-            mailbox,
-            messages: Vec::new(),
-            server_time: String::new(),
-        })
+        &pages::inbox(
+            Locale::Ar,
+            &InboxModel {
+                mailbox,
+                messages: Vec::new(),
+                server_time: String::new(),
+            },
+        )
         .into_string(),
     );
     out

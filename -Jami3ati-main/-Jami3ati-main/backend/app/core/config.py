@@ -36,6 +36,15 @@ class Settings(BaseSettings):
     DELIVERY_HTTP_TIMEOUT_SECONDS: int = 10
     CONFIRM_TOKEN_TTL_HOURS: int = 48
 
+    # --- Change detector (the poller) ---
+    # Off by default: a demo or a test run must not start touching public
+    # servers because the process happened to boot. Enable explicitly.
+    POLLER_ENABLED: bool = False
+    POLLER_INTERVAL_SECONDS: int = 900
+    POLLER_MAX_SOURCES_PER_PASS: int = 10
+    POLLER_USER_AGENT: str = "Jami3atiBot/0.1 (+https://jami3ati.ma/bot)"
+    POLLER_HTTP_TIMEOUT_SECONDS: float = 15.0
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -13,9 +13,9 @@
 mail.ma/
 ├── .github/workflows/ci.yml
 ├── crates/
-│   ├── tira-api/{src/lib.rs, src/main.rs, src/read.rs, tests/health.rs, tests/read.rs}
+│   ├── tira-api/{src/lib.rs, src/main.rs, src/locale.rs, src/pages.rs, src/read.rs, src/send.rs, src/signup.rs, tests/health.rs, tests/read.rs}
 │   ├── tira-auth/{src/lib.rs, src/password.rs, src/otp.rs}
-│   ├── tira-frontend/src/lib.rs
+│   ├── tira-frontend/{src/{lib.rs, i18n.rs, layout.rs, pages.rs, components.rs, assets.rs}, assets/{app.css, auth.js}}
 │   ├── tira-module/src/lib.rs
 │   ├── tira-smtp/{src/lib.rs, src/server.rs, src/client.rs, src/message.rs, tests/session.rs}
 │   ├── tira-store/
@@ -24,22 +24,35 @@ mail.ma/
 │   │   └── tests/{blob.rs, persist.rs}
 │   └── tira-vault/src/lib.rs
 ├── data/                          (وقت التشغيل: blobs + سجلات — غير مُتتبَّع)
-├── docs/{CORRECTIONS.md, DEEP_MAP.ar.md, deep-map.html}
+├── docs/{CORRECTIONS.md, DEEP_MAP.ar.md, LOCAL-TESTING.md, deep-map.html}
 ├── scripts/
 │   ├── dev.ps1                    (check | test | test-db | clippy | fmt | run | clean)
+│   ├── dev-local.ps1              (تشغيل محلي لمستخدمين: tira_dev + /signup + SMTP محلي)
 │   ├── pg-dev.ps1                 (PostgreSQL محمول على 55432)
 │   ├── imap-proof.ps1             (STARTTLS + LOGIN + APPEND + FETCH + IMAPS)
 │   ├── smtp-proof.ps1             (وارد بلا مصادقة + AUTH PLAIN + تحقق IMAP)
 │   └── jmap-proof.ps1             (session + Mailbox/get + Email/query + Email/get)
 ├── Cargo.toml / Cargo.lock
+├── .env.example                   (متغيرات التشغيل المحلي — توثيق لا يُقرأ تلقائياً)
 ├── README.md
 ├── BARID_STRATEGIC_REPORT.ar.md   (يحتوي أخطاء — راجع docs/CORRECTIONS.md)
 ├── BARID_DEEP_PLAN.ar.md          (يحتوي أخطاء — راجع docs/CORRECTIONS.md)
 └── FOLDER_STRUCTURE.md            (هذا الملف)
 ```
 
-كل الـ crates السبعة موجودة وتُبنى وتُختبر فعلياً (45 اختباراً، 7 منها على
-PostgreSQL 16 حقيقي).
+كل الـ crates الثمانية موجودة وتُبنى وتُختبر فعلياً. القياس الحالي (19 نوفمبر
+2026، بعد §9.54): **302** اختباراً، منها **56** على PostgreSQL حقيقي، عبر
+`.\scripts\dev.ps1 test-db` (exit `0`). الأرقام الأقدم في هذا الملف كانت لقطة
+مؤرَّخة، وآخرها في §9.52.
+
+**اللغات:** نصوص `/login` و`/signup` وجمل أخطائهما وهيكل المستند تأتي من مصدر
+واحد (`tira-frontend/src/i18n.rs`: عربي/فرنسي/إنجليزي)، والاختيار يُحفظ في كوكي
+`tira_lang` ويُحلّ عبر `tira-api/src/locale.rs`. **قشرة صندوق البريد كلها
+(الوارد، القارئ، التحرير، الملف الشخصي، النسخة المطبوعة) وصفحات الفشل
+(400/404/503) بثلاث لغات**، مع ترجمة واجهة الرسالة فقط وإبقاء الموضوع والمرسل
+والنص كما وردت (`dir="auto"` عليها، و`dir="ltr"` على العناوين والمعرّفات).
+`assets/auth.js` مُحسِّن تدريجي (إظهار كلمة المرور، تنبيه عدم التطابق، Caps Lock)
+بلا شبكة ولا تخزين، ويُحمَّل في صفحات المصادقة فقط.
 
 **خارج المستودع (بيئة الإثبات فقط):** `C:\tools\stalwart\` يحتوي
 `stalwart.exe` (1.0.2) و`stalwart-cli.exe` (1.0.14)، ومعه

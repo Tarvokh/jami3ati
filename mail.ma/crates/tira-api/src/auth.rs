@@ -121,11 +121,13 @@ impl FromRequestParts<AppState> for PageAuth {
             Ok(Auth(context)) => Ok(Self(context)),
             Err(AuthError::Missing) => Err(axum::response::Redirect::to("/login").into_response()),
             Err(AuthError::NoStore) => Err(crate::pages::service_unavailable_response(
+                crate::locale::resolve(&parts.headers, None),
                 "no database configured",
             )),
             Err(AuthError::Unavailable(err)) => {
                 tracing::warn!(%err, "token lookup failed");
                 Err(crate::pages::service_unavailable_response(
+                    crate::locale::resolve(&parts.headers, None),
                     "storage unavailable",
                 ))
             }

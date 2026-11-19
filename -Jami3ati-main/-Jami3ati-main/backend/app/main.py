@@ -6,12 +6,21 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
+from app.api.routes import proof
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine
 
 # Import every model module before create_all: metadata is populated by import
 # side effects, and a model that is never imported never becomes a table.
-from app.models import institution, notification, report, subscription, university  # noqa: F401
+from app.models import (  # noqa: F401
+    fact,
+    institution,
+    notification,
+    report,
+    source,
+    subscription,
+    university,
+)
 
 logger = logging.getLogger("jami3ati.deliveries")
 
@@ -60,6 +69,39 @@ def _delivery_loop(stop: threading.Event) -> None:
         stop.wait(settings.DELIVERY_POLL_SECONDS)
 
 
+def _poller_loop(stop: threading.Event) -> None:
+    """Poll due sources until the process stops.
+
+    Disabled unless POLLER_ENABLED is true. A pass never raises: a source that
+    is down is recorded on its row, and the next tick tries again.
+    """
+    from app.services import poller
+
+    logger.warning(
+        "poller started: every %ss, user agent %s",
+        settings.POLLER_INTERVAL_SECONDS,
+        settings.POLLER_USER_AGENT,
+    )
+    while not stop.is_set():
+        try:
+            with SessionLocal() as db:
+                outcomes = poller.poll_due_sources(
+                    db,
+                    user_agent=settings.POLLER_USER_AGENT,
+                    limit=settings.POLLER_MAX_SOURCES_PER_PASS,
+                )
+            changed = [o for o in outcomes if o.status == "changed"]
+            if changed:
+                logger.warning(
+                    "poller pass found %d change(s): %s",
+                    len(changed),
+                    [o.fact_id for o in changed],
+                )
+        except Exception:  # noqa: BLE001 - the loop must survive one bad pass
+            logger.exception("poller pass failed; retrying next tick")
+        stop.wait(settings.POLLER_INTERVAL_SECONDS)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     stop = threading.Event()
@@ -76,12 +118,26 @@ async def lifespan(_: FastAPI):
         logger.warning(
             "delivery worker disabled: TIRA_OUTBOUND_TOKEN / TIRA_MAILBOX_ID unset"
         )
+
+    poller_thread = None
+    if settings.POLLER_ENABLED:
+        poller_thread = threading.Thread(
+            target=_poller_loop,
+            args=(stop,),
+            name="jami3ati-poller",
+            daemon=True,
+        )
+        poller_thread.start()
+    else:
+        logger.info("poller disabled: set POLLER_ENABLED=true to enable")
+
     try:
         yield
     finally:
         stop.set()
-        if thread is not None:
-            thread.join(timeout=5)
+        for worker in (thread, poller_thread):
+            if worker is not None:
+                worker.join(timeout=5)
 
 
 app = FastAPI(
@@ -113,6 +169,9 @@ app.add_middleware(
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
+# The proof page lives at the root, not under /api/v1: it is a public document
+# a student can open from an email, not a machine endpoint.
+app.include_router(proof.router)
 
 
 @app.get("/")

@@ -70,7 +70,7 @@ async fn version_endpoint_identifies_the_product() {
 }
 
 #[tokio::test]
-async fn the_inbox_screen_is_rendered_by_the_server() {
+async fn the_login_screen_is_rendered_by_the_server() {
     let response = test_app()
         .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
         .await

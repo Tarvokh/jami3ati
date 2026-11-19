@@ -1,48 +1,89 @@
 //! Presentation helpers.
 //!
-//! Every function here is pure: same input, same output, no clock reads, no
-//! locale lookup. That keeps them testable and keeps the pages deterministic.
+//! Every function here is pure: same input, same output, no clock reads. The
+//! locale is an explicit argument rather than a global, so a French page and an
+//! Arabic page can be rendered from the same data in one test and the output
+//! stays deterministic.
 
 use chrono::{DateTime, Datelike, Duration, FixedOffset};
 
-/// Human byte size in Arabic units. Deliberately decimal-free under 1 KiB so
-/// a 119-byte test message reads as `119 بايت`, not `0.1 ك.ب`.
-pub fn bytes(n: i64) -> String {
+use crate::i18n::Locale;
+
+/// Human byte size in the locale's units. Deliberately decimal-free under
+/// 1 KiB so a 119-byte test message reads as `119 بايت`, not `0.1 ك.ب`.
+pub fn bytes(locale: Locale, n: i64) -> String {
     let n = n.max(0);
+    let (unit, kibi, mebi, gibi) = match locale {
+        Locale::Ar => ("بايت", "ك.ب", "م.ب", "ج.ب"),
+        Locale::Fr => ("octets", "Ko", "Mo", "Go"),
+        Locale::En => ("bytes", "KB", "MB", "GB"),
+    };
     if n < 1024 {
-        return format!("{n} بايت");
+        // French and English inflect the unit; Arabic does not.
+        let unit = match (locale, n) {
+            (Locale::Fr, 1) => "octet",
+            (Locale::En, 1) => "byte",
+            _ => unit,
+        };
+        return format!("{n} {unit}");
     }
     let kib = n as f64 / 1024.0;
     if kib < 1024.0 {
-        return format!("{kib:.1} ك.ب");
+        return format!("{kib:.1} {kibi}");
     }
     let mib = kib / 1024.0;
     if mib < 1024.0 {
-        return format!("{mib:.1} م.ب");
+        return format!("{mib:.1} {mebi}");
     }
-    format!("{:.2} ج.ب", mib / 1024.0)
+    format!("{:.2} {gibi}", mib / 1024.0)
 }
 
-/// Compact timestamp for list rows: today shows the clock, yesterday shows
-/// `أمس`, this year shows `day/month`, older shows the full date.
-pub fn stamp(ts: DateTime<FixedOffset>, now: DateTime<FixedOffset>) -> String {
+/// Compact timestamp for list rows: today shows the clock, yesterday shows the
+/// locale's word for it, this year shows a short date, older a full date.
+pub fn stamp(locale: Locale, ts: DateTime<FixedOffset>, now: DateTime<FixedOffset>) -> String {
     let day = ts.date_naive();
     let today = now.date_naive();
 
     if day == today {
         ts.format("%H:%M").to_string()
     } else if day + Duration::days(1) == today {
-        "أمس".to_string()
+        match locale {
+            Locale::Ar => "أمس".to_string(),
+            Locale::Fr => "hier".to_string(),
+            Locale::En => "yesterday".to_string(),
+        }
     } else if day.year() == today.year() {
-        ts.format("%d/%m").to_string()
+        short_date(locale, ts)
     } else {
-        ts.format("%d/%m/%Y").to_string()
+        long_date(locale, ts)
     }
 }
 
-/// Full timestamp for the reading pane.
-pub fn full_stamp(ts: DateTime<FixedOffset>) -> String {
-    ts.format("%Y-%m-%d %H:%M").to_string()
+/// Full timestamp for the reading pane and the session list.
+pub fn full_stamp(locale: Locale, ts: DateTime<FixedOffset>) -> String {
+    match locale {
+        Locale::Ar => ts.format("%Y-%m-%d %H:%M").to_string(),
+        Locale::Fr => ts.format("%d/%m/%Y %H:%M").to_string(),
+        Locale::En => ts.format("%d %b %Y %H:%M").to_string(),
+    }
+}
+
+/// Day and month without a year. English uses a month abbreviation because a
+/// numeric `11/04` is read as April by half the audience and November by the
+/// other half; the abbreviation cannot be misread.
+fn short_date(locale: Locale, ts: DateTime<FixedOffset>) -> String {
+    match locale {
+        Locale::Ar | Locale::Fr => ts.format("%d/%m").to_string(),
+        Locale::En => ts.format("%d %b").to_string(),
+    }
+}
+
+/// Day, month and year.
+fn long_date(locale: Locale, ts: DateTime<FixedOffset>) -> String {
+    match locale {
+        Locale::Ar | Locale::Fr => ts.format("%d/%m/%Y").to_string(),
+        Locale::En => ts.format("%d %b %Y").to_string(),
+    }
 }
 
 /// First visible character, used for the avatar. ASCII is uppercased so
@@ -136,19 +177,62 @@ mod tests {
 
     #[test]
     fn byte_sizes_keep_small_values_honest() {
-        assert_eq!(bytes(0), "0 بايت");
-        assert_eq!(bytes(119), "119 بايت");
-        assert_eq!(bytes(2048), "2.0 ك.ب");
-        assert_eq!(bytes(5 * 1024 * 1024), "5.0 م.ب");
+        assert_eq!(bytes(Locale::Ar, 0), "0 بايت");
+        assert_eq!(bytes(Locale::Ar, 119), "119 بايت");
+        assert_eq!(bytes(Locale::Ar, 2048), "2.0 ك.ب");
+        assert_eq!(bytes(Locale::Ar, 5 * 1024 * 1024), "5.0 م.ب");
+        assert_eq!(bytes(Locale::Fr, 1), "1 octet");
+        assert_eq!(bytes(Locale::Fr, 119), "119 octets");
+        assert_eq!(bytes(Locale::Fr, 2048), "2.0 Ko");
+        assert_eq!(bytes(Locale::En, 1), "1 byte");
+        assert_eq!(bytes(Locale::En, 119), "119 bytes");
+        assert_eq!(bytes(Locale::En, 5 * 1024 * 1024), "5.0 MB");
     }
 
     #[test]
     fn timestamps_are_relative_to_the_supplied_now() {
         let now = at("2026-11-07T12:00:00+01:00");
-        assert_eq!(stamp(at("2026-11-07T10:42:00+01:00"), now), "10:42");
-        assert_eq!(stamp(at("2026-11-06T23:10:00+01:00"), now), "أمس");
-        assert_eq!(stamp(at("2026-11-04T09:00:00+01:00"), now), "04/11");
-        assert_eq!(stamp(at("2025-11-04T09:00:00+01:00"), now), "04/11/2025");
+        assert_eq!(
+            stamp(Locale::Ar, at("2026-11-07T10:42:00+01:00"), now),
+            "10:42"
+        );
+        assert_eq!(
+            stamp(Locale::Ar, at("2026-11-06T23:10:00+01:00"), now),
+            "أمس"
+        );
+        assert_eq!(
+            stamp(Locale::Ar, at("2026-11-04T09:00:00+01:00"), now),
+            "04/11"
+        );
+        assert_eq!(
+            stamp(Locale::Ar, at("2025-11-04T09:00:00+01:00"), now),
+            "04/11/2025"
+        );
+
+        assert_eq!(
+            stamp(Locale::Fr, at("2026-11-06T23:10:00+01:00"), now),
+            "hier"
+        );
+        assert_eq!(
+            stamp(Locale::En, at("2026-11-06T23:10:00+01:00"), now),
+            "yesterday"
+        );
+        assert_eq!(
+            stamp(Locale::En, at("2026-11-04T09:00:00+01:00"), now),
+            "04 Nov"
+        );
+        assert_eq!(
+            stamp(Locale::En, at("2025-11-04T09:00:00+01:00"), now),
+            "04 Nov 2025"
+        );
+    }
+
+    #[test]
+    fn full_stamps_follow_the_locale() {
+        let ts = at("2026-11-04T09:42:00+01:00");
+        assert_eq!(full_stamp(Locale::Ar, ts), "2026-11-04 09:42");
+        assert_eq!(full_stamp(Locale::Fr, ts), "04/11/2026 09:42");
+        assert_eq!(full_stamp(Locale::En, ts), "04 Nov 2026 09:42");
     }
 
     #[test]

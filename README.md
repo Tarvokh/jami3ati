@@ -30,14 +30,20 @@
 > صحيحة. سلسلة الثقة هي `source_url` + `verified_at` + `notification_id`. لا نخلط
 > بينهما، ولا ندّعي توقيعًا من أي وزارة.
 
-## الحالة المقيسة اليوم — 17 نوفمبر 2026
+## الحالة المقيسة اليوم — 19 نوفمبر 2026
 
 | المكوّن | ما هو | القياس الفعلي |
 |---|---|---|
-| **Tira Mail** | Rust workspace، 8 crates، 10 migrations، axum 0.8، lettre 0.11.23 (rustls) | **276** اختبارًا ناجحًا، **0** فاشل، **0** متجاهَل — 33 target |
-| **Jami3ati API** | FastAPI + PostgreSQL 16 مع RLS | **57** اختبارًا ناجحًا، **0** فاشل |
+| **Tira Mail** | Rust workspace، 8 crates، 10 migrations، axum 0.8، lettre 0.11.23 (rustls) | **302** اختبارًا ناجحًا، **0** فاشل، **0** متجاهَل — 33 target |
+| **Jami3ati API** | FastAPI + PostgreSQL 16 مع RLS | **72** اختبارًا ناجحًا، **0** فاشل — منها **15** لحلقة الرصد |
+| **حلقة الرصد** | `sources` · `fact_history` · `poller` · `/n/{id}` | مصدران: رسمي واحد + تقني موسوم غير رسمي؛ **واقعة واحدة** معتمدة؛ صفحة إثبات حيّة (`200`، CSP صارم، بلا JavaScript) |
 | **كتالوج العرض** | `src/data/seedData.ts` | **12** كيانًا: 3 جامعات + 9 مؤسسات — منها **10 `verified`** |
-| **قاعدة العرض** | `jami3ati_demo` | **3** كيانات: جامعتان + مؤسسة واحدة، كلها `verified` |
+| **قاعدة العرض** | `jami3ati_demo` | **3** كيانات: جامعتان + مؤسسة واحدة؛ ومصدران وواقعة واحدة معتمدة |
+
+**آخر تحقق حيّ (19 نوفمبر 2026):** المصدر الرسمي
+`https://www.uit.ac.ma/category/admission/` أُعيد استقصاؤه فعاد `not_modified`
+بلا واقعة — لا نختلق تغييرًا. والمصدر التقني المحلي موسوم `is_official=false`،
+وواقعته تحمل `source_change` لا `official_change`.
 
 الكتالوج بيانات عرض موسومة (`demo` / `needs_review` ظاهرة للمستخدم)، وليست تغطية
 وطنية. القاعدة تحتوي عيّنة أصغر من الكتالوج، ونقول ذلك صراحةً بدل رقم واحد يصلح
@@ -139,6 +145,8 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 - لا ندّعي توقيعًا رقميًا من أي وزارة أو مؤسسة.
 - لا ندّعي أن `202` يعني وصول البريد؛ التسليم يُقاس في `notification_deliveries`.
+- لا ندّعي إرسال بريد في هذه النسخة: بيانات Tira (`TIRA_OUTBOUND_TOKEN` /
+  `TIRA_MAILBOX_ID`) غير مهيّأة، وصفّا التسليم ما زالا `pending`.
 - لا ندّعي تغطية وطنية: الكتالوج 12 كيانًا (10 `verified`)، والقاعدة 3.
 - لا يوجد API رسمي بعد؛ نعتمد استقصاءً دوريًا منخفض المعدّل محترمًا لـ`robots.txt`.
 - لا نضمن أن يظهر DKIM «أخضر» على المسرح؛ الدليل الأساسي هو `/n/{id}` و`source_url`.
@@ -172,9 +180,15 @@ JavaScript). Jami3ati decides *what* and *to whom*; Tira executes *how* — over
 single HTTP contract (`POST /api/v1/outbound`, `202 Accepted`, mandatory
 `idempotency_key`, closed header set). No shared database.
 
-**Measured on 17 November 2026:** 276 Tira tests passed (0 failed, 0 ignored,
-33 targets); 57 Jami3ati tests passed. Demo catalogue: 12 entities, 10 `verified`.
-Demo database: 3 entities. This is a labelled sample, not national coverage.
+**Measured on 19 November 2026:** 302 Tira tests passed (0 failed, 0 ignored,
+33 targets); 72 Jami3ati tests passed (15 for the observation loop). The loop is
+live: 2 registered sources (1 official, 1 non-official rehearsal), 1 approved
+fact, and a public `/n/{id}` page (200, strict CSP, no JavaScript). Demo
+catalogue: 12 entities, 10 `verified`. Demo database: 3 entities (2 universities
++ 1 institution), plus 2 sources and 1 fact.
+
+**No email was sent in this build:** Tira credentials are not configured, so the
+two delivery rows remain `pending`.
 
 **What we do not claim:** no ministry signature; `202` is not delivery; no official
 API exists yet (polite polling only); DKIM authenticates the domain, not the fact.

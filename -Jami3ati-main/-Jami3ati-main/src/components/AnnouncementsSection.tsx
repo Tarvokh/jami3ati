@@ -38,6 +38,7 @@ function sourceHost(url: string): string {
 
 function kindLabel(kind: string, isAr: boolean): string {
   if (kind === 'official_change') return isAr ? 'تغيير رسمي' : 'Changement officiel';
+  if (kind === 'source_change') return isAr ? 'تغيّر على مصدر مسجَّل' : 'Changement sur une source';
   return kind;
 }
 

@@ -20,13 +20,14 @@ use axum::Form;
 use chrono::{Duration, Local};
 use serde::Deserialize;
 use tira_frontend::{
-    format, pages, InboxModel, MailboxModel, MessageModel, ProfileModel, ReadingMessage,
-    ReadingModel, SessionModel,
+    format, i18n::Locale, pages, InboxModel, MailboxModel, MessageModel, ProfileModel,
+    ReadingMessage, ReadingModel, SessionModel,
 };
 use tira_store::{AuditContext, MailboxProfile, PgStore, StoredMessage};
 use uuid::Uuid;
 
 use crate::auth::{secret_from_headers, PageAuth};
+use crate::locale::{self, LangQuery};
 use crate::read::RequestMeta;
 use crate::AppState;
 
@@ -41,14 +42,14 @@ const INBOX_LIMIT: i64 = 100;
 /// Password policy for *new* Tira control-plane credentials. Login itself only
 /// requires a non-empty password, because an existing credential may predate a
 /// policy change and locking it out would be worse than accepting it.
-const MIN_PASSWORD_CHARS: usize = 12;
-const MAX_PASSWORD_CHARS: usize = 128;
+pub(crate) const MIN_PASSWORD_CHARS: usize = 12;
+pub(crate) const MAX_PASSWORD_CHARS: usize = 128;
 const MAX_DISPLAY_NAME_CHARS: usize = 80;
 
 /// Web sessions are mailbox-scoped API tokens with a fixed lifetime. The label
 /// makes them distinguishable from operator-issued tokens in the profile list.
-const SESSION_LABEL: &str = "session:web";
-const SESSION_TTL_DAYS: i64 = 7;
+pub(crate) const SESSION_LABEL: &str = "session:web";
+pub(crate) const SESSION_TTL_DAYS: i64 = 7;
 
 /// The local part of the address is never a good password. This is a cheap
 /// check, not a composition rule: length is the property that matters.
@@ -67,32 +68,92 @@ pub(crate) fn html(status: StatusCode, markup: tira_frontend::Markup) -> Respons
     response
 }
 
-pub(crate) fn problem(status: StatusCode, eyebrow: &str, title: &str, message: &str) -> Response {
-    html(status, pages::problem(eyebrow, title, message))
+/// Why a page could not be built. The copy comes from the locale's shell table
+/// so a French page never renders an Arabic failure sentence, and the status
+/// code still says what happened.
+pub(crate) enum ProblemKind {
+    BadLink,
+    BadMessageLink,
+    BadComposeRequest,
+    MissingMailbox,
+    MissingMessage,
+    WrongMailbox,
+    DeletedMailbox,
 }
 
-pub(crate) fn unavailable(err: impl std::fmt::Display) -> Response {
+pub(crate) fn problem(status: StatusCode, locale: Locale, kind: ProblemKind) -> Response {
+    let text = locale.shell();
+    let (eyebrow, title, message) = match kind {
+        ProblemKind::BadLink => (
+            text.problem_bad_link_eyebrow,
+            text.problem_bad_link_title,
+            text.problem_bad_link_message,
+        ),
+        ProblemKind::BadMessageLink => (
+            text.problem_bad_link_eyebrow,
+            text.problem_bad_link_title,
+            text.problem_bad_message_link_message,
+        ),
+        ProblemKind::BadComposeRequest => (
+            text.problem_bad_request_eyebrow,
+            text.problem_bad_request_title,
+            text.problem_bad_request_message,
+        ),
+        ProblemKind::MissingMailbox => (
+            text.problem_not_found_eyebrow,
+            text.problem_missing_mailbox,
+            text.problem_check_link,
+        ),
+        ProblemKind::MissingMessage => (
+            text.problem_not_found_eyebrow,
+            text.problem_missing_message,
+            text.problem_check_link,
+        ),
+        ProblemKind::WrongMailbox => (
+            text.problem_not_found_eyebrow,
+            text.problem_wrong_mailbox,
+            text.problem_wrong_mailbox_message,
+        ),
+        ProblemKind::DeletedMailbox => (
+            text.problem_not_found_eyebrow,
+            text.problem_missing_mailbox,
+            text.problem_deleted,
+        ),
+    };
+    html(status, pages::problem(locale, eyebrow, title, message))
+}
+
+pub(crate) fn unavailable(locale: Locale, err: impl std::fmt::Display) -> Response {
     tracing::warn!(%err, "page render failed");
     html(
         StatusCode::SERVICE_UNAVAILABLE,
-        pages::service_unavailable("storage unavailable"),
+        pages::service_unavailable(locale, "storage unavailable"),
     )
 }
 
-pub(crate) fn no_store() -> Response {
+pub(crate) fn no_store(locale: Locale) -> Response {
     html(
         StatusCode::SERVICE_UNAVAILABLE,
-        pages::service_unavailable("no database configured"),
+        pages::service_unavailable(locale, "no database configured"),
     )
 }
 
 /// Public wrapper used by the auth extractor's rejection path. Kept next to the
 /// other page renderers so the 503 body stays identical everywhere.
-pub fn service_unavailable_response(detail: &str) -> Response {
+pub fn service_unavailable_response(locale: Locale, detail: &str) -> Response {
     html(
         StatusCode::SERVICE_UNAVAILABLE,
-        pages::service_unavailable(detail),
+        pages::service_unavailable(locale, detail),
     )
+}
+
+/// Writes the `?lang=` choice back as a cookie so the next POST — which carries
+/// no query string — renders in the same language.
+pub(crate) fn persist_locale(mut response: Response, lang: Option<&str>) -> Response {
+    if let Some(chosen) = lang.and_then(Locale::from_code) {
+        locale::set_cookie(&mut response, chosen, cookie_secure());
+    }
+    response
 }
 
 fn server_time() -> String {
@@ -134,7 +195,7 @@ async fn snippet_for(store: &PgStore, message: &StoredMessage) -> Option<String>
     .flatten()
 }
 
-async fn message_model(store: &PgStore, message: &StoredMessage) -> MessageModel {
+async fn message_model(store: &PgStore, message: &StoredMessage, locale: Locale) -> MessageModel {
     MessageModel {
         id: message.id.to_string(),
         from_addr: message.from_addr.clone(),
@@ -142,6 +203,7 @@ async fn message_model(store: &PgStore, message: &StoredMessage) -> MessageModel
         snippet: snippet_for(store, message).await,
         size_bytes: message.size_bytes,
         received_label: format::stamp(
+            locale,
             message.received_at.with_timezone(&Local).fixed_offset(),
             Local::now().fixed_offset(),
         ),
@@ -153,30 +215,50 @@ async fn message_model(store: &PgStore, message: &StoredMessage) -> MessageModel
 /// form. With no database configured the form still renders (200): the failure
 /// belongs on submit, not on a page that needs no storage.
 pub async fn root(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let locale = locale::resolve(&headers, None);
     let Some(store) = state.store.as_ref() else {
-        return html(StatusCode::OK, pages::login(None));
+        return html(StatusCode::OK, login_markup(locale, None));
     };
 
     let Some(secret) = secret_from_headers(&headers) else {
-        return html(StatusCode::OK, pages::login(None));
+        return html(StatusCode::OK, login_markup(locale, None));
     };
 
     match store.resolve_token(secret).await {
         Ok(Some(token)) => match token.mailbox_id {
             Some(id) => Redirect::to(&format!("/mail/{id}")).into_response(),
-            None => html(StatusCode::OK, pages::scope_notice()),
+            None => html(StatusCode::OK, pages::scope_notice(locale)),
         },
         Ok(None) => html(
             StatusCode::OK,
-            pages::login(Some("انتهت الجلسة أو أُلغي التوكن. الصق توكنًا جديدًا.")),
+            login_markup(locale, Some(locale.auth().err_session_expired)),
         ),
-        Err(err) => unavailable(err),
+        Err(err) => unavailable(locale, err),
     }
 }
 
 /// `GET /login`
-pub async fn login_form() -> Response {
-    html(StatusCode::OK, pages::login(None))
+///
+/// `?lang=` is the switcher link. When it names a supported language, the
+/// answer also stores it in a cookie so the following POST renders in the same
+/// language (a form submission carries no query string).
+pub async fn login_form(Query(query): Query<LangQuery>, headers: HeaderMap) -> Response {
+    let locale = locale::resolve(&headers, query.lang.as_deref());
+    let mut response = html(StatusCode::OK, login_markup(locale, None));
+    if let Some(chosen) = query.lang.as_deref().and_then(Locale::from_code) {
+        locale::set_cookie(&mut response, chosen, cookie_secure());
+    }
+    response
+}
+
+/// The login screen gains its "create a mailbox" link only when the dev signup
+/// route is actually mounted; otherwise that link would be a dead control.
+fn login_markup(locale: Locale, error: Option<&str>) -> tira_frontend::Markup {
+    if crate::signup::enabled() {
+        pages::login_with_signup(locale, error)
+    } else {
+        pages::login(locale, error)
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -213,10 +295,12 @@ enum LoginMode {
 pub async fn login_submit(
     State(state): State<AppState>,
     meta: RequestMeta,
+    headers: HeaderMap,
     Form(form): Form<LoginForm>,
 ) -> Response {
+    let locale = locale::resolve(&headers, None);
     let Some(store) = state.store.as_ref() else {
-        return no_store();
+        return no_store(locale);
     };
 
     let mode = if form.mode.eq_ignore_ascii_case("token")
@@ -228,17 +312,23 @@ pub async fn login_submit(
     };
 
     match mode {
-        LoginMode::Token => token_login(store, &form, &meta).await,
-        LoginMode::Password => password_login(&state, store, &form, &meta).await,
+        LoginMode::Token => token_login(store, &form, &meta, locale).await,
+        LoginMode::Password => password_login(&state, store, &form, &meta, locale).await,
     }
 }
 
-async fn token_login(store: &PgStore, form: &LoginForm, meta: &RequestMeta) -> Response {
+async fn token_login(
+    store: &PgStore,
+    form: &LoginForm,
+    meta: &RequestMeta,
+    locale: Locale,
+) -> Response {
+    let text = locale.auth();
     let secret = form.token.trim();
     if secret.is_empty() {
         return html(
             StatusCode::BAD_REQUEST,
-            pages::login(Some("أدخل توكن الوصول أولًا.")),
+            pages::login(locale, Some(text.err_token_required)),
         );
     }
 
@@ -257,7 +347,7 @@ async fn token_login(store: &PgStore, form: &LoginForm, meta: &RequestMeta) -> R
                 )
                 .await
             {
-                return unavailable(err);
+                return unavailable(locale, err);
             }
 
             let mut response = match token.mailbox_id {
@@ -269,9 +359,9 @@ async fn token_login(store: &PgStore, form: &LoginForm, meta: &RequestMeta) -> R
         }
         Ok(None) => html(
             StatusCode::UNAUTHORIZED,
-            pages::login(Some("التوكن غير صحيح أو منتهي أو ملغى.")),
+            pages::login(locale, Some(text.err_token_invalid)),
         ),
-        Err(err) => unavailable(err),
+        Err(err) => unavailable(locale, err),
     }
 }
 
@@ -280,11 +370,13 @@ async fn password_login(
     store: &PgStore,
     form: &LoginForm,
     meta: &RequestMeta,
+    locale: Locale,
 ) -> Response {
+    let text = locale.auth();
     let Some(email) = normalize_email(&form.email) else {
         return html(
             StatusCode::BAD_REQUEST,
-            pages::login(Some("أدخل بريدًا إلكترونيًا صحيحًا.")),
+            pages::login(locale, Some(text.err_bad_email)),
         );
     };
 
@@ -292,13 +384,13 @@ async fn password_login(
     if password.is_empty() {
         return html(
             StatusCode::BAD_REQUEST,
-            pages::login(Some("أدخل كلمة المرور.")),
+            pages::login(locale, Some(text.err_password_required)),
         );
     }
     if password.chars().count() > MAX_PASSWORD_CHARS {
         return html(
             StatusCode::BAD_REQUEST,
-            pages::login(Some("كلمة المرور طويلة جدًا.")),
+            pages::login(locale, Some(text.err_password_long)),
         );
     }
 
@@ -332,12 +424,12 @@ async fn password_login(
         {
             tracing::warn!(%err, "could not audit a rate-limited login");
         }
-        return too_many_requests();
+        return too_many_requests(locale);
     }
 
     let credential = match store.credential_by_address(&email).await {
         Ok(value) => value,
-        Err(err) => return unavailable(err),
+        Err(err) => return unavailable(locale, err),
     };
 
     // A missing credential still pays for one Argon2id verification against a
@@ -376,12 +468,12 @@ async fn password_login(
             )
             .await
         {
-            return unavailable(err);
+            return unavailable(locale, err);
         }
 
         return html(
             StatusCode::UNAUTHORIZED,
-            pages::login(Some("البريد الإلكتروني أو كلمة المرور غير صحيحة.")),
+            pages::login(locale, Some(text.err_credentials)),
         );
     }
 
@@ -390,7 +482,7 @@ async fn password_login(
         // safe answer is the same generic rejection, not a panic.
         return html(
             StatusCode::UNAUTHORIZED,
-            pages::login(Some("البريد الإلكتروني أو كلمة المرور غير صحيحة.")),
+            pages::login(locale, Some(text.err_credentials)),
         );
     };
 
@@ -404,7 +496,7 @@ async fn password_login(
         .await
     {
         Ok(issued) => issued,
-        Err(err) => return unavailable(err),
+        Err(err) => return unavailable(locale, err),
     };
 
     let object = format!("mailbox:{mailbox_id}");
@@ -422,7 +514,7 @@ async fn password_login(
     {
         // A session without an audit row must not exist. Revoke before failing.
         let _ = store.revoke_token(issued.record.id).await;
-        return unavailable(err);
+        return unavailable(locale, err);
     }
 
     state.login_limiter.clear(&limiter_key);
@@ -482,7 +574,7 @@ pub async fn logout(
 /// local plain-HTTP demo opts out explicitly with `TIRA_COOKIE_INSECURE=1`;
 /// production needs no variable at all. Kept separate from the builders so they
 /// stay pure and deterministically testable.
-fn cookie_secure() -> bool {
+pub(crate) fn cookie_secure() -> bool {
     std::env::var("TIRA_COOKIE_INSECURE").as_deref() != Ok("1")
 }
 
@@ -496,7 +588,7 @@ fn session_cookie(secret: &str, secure: bool) -> String {
     )
 }
 
-fn set_session_cookie(response: &mut Response, secret: &str) {
+pub(crate) fn set_session_cookie(response: &mut Response, secret: &str) {
     response.headers_mut().insert(
         header::SET_COOKIE,
         HeaderValue::from_str(&session_cookie(secret, cookie_secure()))
@@ -523,10 +615,10 @@ fn clear_session_redirect(location: &str) -> Response {
     response
 }
 
-fn too_many_requests() -> Response {
+pub(crate) fn too_many_requests(locale: Locale) -> Response {
     let mut response = html(
         StatusCode::TOO_MANY_REQUESTS,
-        pages::login(Some("محاولات كثيرة. انتظر عشر دقائق ثم أعد المحاولة.")),
+        pages::login(locale, Some(locale.auth().err_too_many)),
     );
     response
         .headers_mut()
@@ -534,7 +626,7 @@ fn too_many_requests() -> Response {
     response
 }
 
-fn audit_context(meta: &RequestMeta, actor: String) -> AuditContext {
+pub(crate) fn audit_context(meta: &RequestMeta, actor: String) -> AuditContext {
     AuditContext {
         request_id: meta.request_id,
         actor,
@@ -600,7 +692,7 @@ async fn verify_password_async(password: String, stored: String) -> bool {
         .unwrap_or(false)
 }
 
-async fn hash_password_async(password: String) -> Result<String, ()> {
+pub(crate) async fn hash_password_async(password: String) -> Result<String, ()> {
     tokio::task::spawn_blocking(move || tira_auth::password::hash_password(&password))
         .await
         .map_err(|_| ())?
@@ -612,19 +704,16 @@ pub async fn inbox_page(
     State(state): State<AppState>,
     auth: PageAuth,
     meta: RequestMeta,
+    headers: HeaderMap,
     Path(mailbox_id): Path<String>,
     Query(query): Query<InboxQuery>,
 ) -> Response {
+    let locale = locale::resolve(&headers, query.lang.as_deref());
     if state.store.is_none() {
-        return no_store();
+        return no_store(locale);
     }
     let Ok(mailbox_id) = Uuid::parse_str(&mailbox_id) else {
-        return problem(
-            StatusCode::BAD_REQUEST,
-            "معرّف غير صالح",
-            "معرّف الصندوق ليس UUID.",
-            "تحقّق من الرابط: معرّفات الصناديق في Tira Mail هي UUID.",
-        );
+        return problem(StatusCode::BAD_REQUEST, locale, ProblemKind::BadLink);
     };
 
     // A confirmation is rendered only when the id was issued by this process
@@ -635,21 +724,25 @@ pub async fn inbox_page(
         .and_then(|raw| Uuid::parse_str(raw).ok())
         .and_then(|id| state.sent_notices.get(mailbox_id, id));
 
-    match inbox_model_for(&state, &auth, &meta, mailbox_id).await {
+    let response = match inbox_model_for(&state, &auth, &meta, mailbox_id, locale).await {
         Ok((inbox, _page)) => html(
             StatusCode::OK,
-            pages::inbox_with_notice(&inbox, sent.as_ref()),
+            pages::inbox_with_notice(locale, &inbox, sent.as_ref()),
         ),
-        Err(err) => err.into_response(),
-    }
+        Err(err) => err.into_response(locale),
+    };
+    persist_locale(response, query.lang.as_deref())
 }
 
 /// Query string of the inbox route. `sent` is the id of a one-shot SMTP
-/// confirmation issued by `POST /mail/{id}/send`.
+/// confirmation issued by `POST /mail/{id}/send`; `lang` is the language
+/// switcher's relative link.
 #[derive(Debug, Default, Deserialize)]
 pub struct InboxQuery {
     #[serde(default)]
     pub sent: Option<String>,
+    #[serde(default)]
+    pub lang: Option<String>,
 }
 
 /// Loads the list half of the workspace, plus the page it was built from.
@@ -662,6 +755,7 @@ async fn inbox_model_for(
     auth: &PageAuth,
     meta: &RequestMeta,
     mailbox_id: Uuid,
+    locale: Locale,
 ) -> Result<(InboxModel, tira_store::MailboxPage), ReadingError> {
     let Some(store) = state.store.as_ref() else {
         return Err(ReadingError::NoStore);
@@ -689,7 +783,7 @@ async fn inbox_model_for(
     // concurrent disk reads to saturate the blocking pool.
     let mut messages = Vec::with_capacity(page.messages.len());
     for message in &page.messages {
-        messages.push(message_model(store, message).await);
+        messages.push(message_model(store, message, locale).await);
     }
 
     Ok((
@@ -715,35 +809,19 @@ enum ReadingError {
     Unavailable(String),
 }
 
-impl IntoResponse for ReadingError {
-    fn into_response(self) -> Response {
+impl ReadingError {
+    fn into_response(self, locale: Locale) -> Response {
         match self {
-            Self::NoStore => no_store(),
-            Self::BadId => problem(
-                StatusCode::BAD_REQUEST,
-                "معرّف غير صالح",
-                "أحد المعرّفين في الرابط ليس UUID.",
-                "تحقّق من الرابط: معرّفات الصناديق والرسائل في Tira Mail هي UUID.",
-            ),
-            Self::MissingMailbox => problem(
-                StatusCode::NOT_FOUND,
-                "غير موجود",
-                "لا يوجد صندوق بهذا المعرّف.",
-                "قد يكون المعرّف خاطئًا أو تابعًا لمستأجر آخر. الردّ واحد في الحالتين حتى لا يمكن تخمين المعرّفات.",
-            ),
-            Self::MissingMessage => problem(
-                StatusCode::NOT_FOUND,
-                "غير موجود",
-                "لا توجد رسالة بهذا المعرّف.",
-                "قد يكون المعرّف خاطئًا أو تابعًا لمستأجر آخر. الردّ واحد في الحالتين حتى لا يمكن تخمين المعرّفات.",
-            ),
-            Self::WrongMailbox => problem(
-                StatusCode::NOT_FOUND,
-                "غير موجود",
-                "لا توجد رسالة بهذا المعرّف في هذا الصندوق.",
-                "الرسالة قد تكون في صندوق آخر. لا نقترح رابطًا بديلًا حتى لا نكشف بنية المستأجر.",
-            ),
-            Self::Unavailable(err) => unavailable(err),
+            Self::NoStore => no_store(locale),
+            Self::BadId => problem(StatusCode::BAD_REQUEST, locale, ProblemKind::BadMessageLink),
+            Self::MissingMailbox => {
+                problem(StatusCode::NOT_FOUND, locale, ProblemKind::MissingMailbox)
+            }
+            Self::MissingMessage => {
+                problem(StatusCode::NOT_FOUND, locale, ProblemKind::MissingMessage)
+            }
+            Self::WrongMailbox => problem(StatusCode::NOT_FOUND, locale, ProblemKind::WrongMailbox),
+            Self::Unavailable(err) => unavailable(locale, err),
         }
     }
 }
@@ -758,6 +836,7 @@ async fn reading_model(
     meta: &RequestMeta,
     mailbox_id: &str,
     message_id: &str,
+    locale: Locale,
 ) -> Result<ReadingModel, ReadingError> {
     let Some(store) = state.store.as_ref() else {
         return Err(ReadingError::NoStore);
@@ -788,7 +867,7 @@ async fn reading_model(
         Err(err) => return Err(ReadingError::Unavailable(err.to_string())),
     };
 
-    reading_model_from_page(state, auth, meta, &page, message_id).await
+    reading_model_from_page(state, auth, meta, &page, message_id, locale).await
 }
 
 /// The rest of the reading model, once the mailbox page has authorized the
@@ -800,6 +879,7 @@ async fn reading_model_from_page(
     meta: &RequestMeta,
     page: &tira_store::MailboxPage,
     message_id: Uuid,
+    locale: Locale,
 ) -> Result<ReadingModel, ReadingError> {
     let Some(store) = state.store.as_ref() else {
         return Err(ReadingError::NoStore);
@@ -875,6 +955,7 @@ async fn reading_model_from_page(
             message_id_hdr: stored.message_id_hdr.clone(),
             size_bytes: stored.size_bytes,
             received_full: format::full_stamp(
+                locale,
                 stored.received_at.with_timezone(&Local).fixed_offset(),
             ),
             received_iso: stored.received_at.to_rfc3339(),
@@ -893,27 +974,34 @@ pub async fn message_page(
     State(state): State<AppState>,
     auth: PageAuth,
     meta: RequestMeta,
+    headers: HeaderMap,
     Path((mailbox_id, message_id)): Path<(String, String)>,
+    Query(query): Query<LangQuery>,
 ) -> Response {
+    let locale = locale::resolve(&headers, query.lang.as_deref());
     if state.store.is_none() {
-        return no_store();
+        return no_store(locale);
     }
     let Ok(mailbox_id) = Uuid::parse_str(&mailbox_id) else {
-        return ReadingError::BadId.into_response();
+        return ReadingError::BadId.into_response(locale);
     };
     let Ok(message_id) = Uuid::parse_str(&message_id) else {
-        return ReadingError::BadId.into_response();
+        return ReadingError::BadId.into_response(locale);
     };
 
-    let (inbox, page) = match inbox_model_for(&state, &auth, &meta, mailbox_id).await {
-        Ok(loaded) => loaded,
-        Err(err) => return err.into_response(),
+    let response = match inbox_model_for(&state, &auth, &meta, mailbox_id, locale).await {
+        Ok((inbox, page)) => {
+            match reading_model_from_page(&state, &auth, &meta, &page, message_id, locale).await {
+                Ok(reading) => html(
+                    StatusCode::OK,
+                    pages::inbox_with_reader(locale, &inbox, &reading),
+                ),
+                Err(err) => err.into_response(locale),
+            }
+        }
+        Err(err) => err.into_response(locale),
     };
-
-    match reading_model_from_page(&state, &auth, &meta, &page, message_id).await {
-        Ok(reading) => html(StatusCode::OK, pages::inbox_with_reader(&inbox, &reading)),
-        Err(err) => err.into_response(),
-    }
+    persist_locale(response, query.lang.as_deref())
 }
 
 /// `GET /mail/{mailbox_id}/message/{message_id}/print`
@@ -925,12 +1013,17 @@ pub async fn message_print_page(
     State(state): State<AppState>,
     auth: PageAuth,
     meta: RequestMeta,
+    headers: HeaderMap,
     Path((mailbox_id, message_id)): Path<(String, String)>,
+    Query(query): Query<LangQuery>,
 ) -> Response {
-    match reading_model(&state, &auth, &meta, &mailbox_id, &message_id).await {
-        Ok(model) => html(StatusCode::OK, pages::message_print(&model)),
-        Err(err) => err.into_response(),
-    }
+    let locale = locale::resolve(&headers, query.lang.as_deref());
+    let response = match reading_model(&state, &auth, &meta, &mailbox_id, &message_id, locale).await
+    {
+        Ok(model) => html(StatusCode::OK, pages::message_print(locale, &model)),
+        Err(err) => err.into_response(locale),
+    };
+    persist_locale(response, query.lang.as_deref())
 }
 
 /// Query string for the compose screen. Only the reply prefill fields are
@@ -942,6 +1035,8 @@ pub struct ComposeQuery {
     pub to: Option<String>,
     #[serde(default)]
     pub subject: Option<String>,
+    #[serde(default)]
+    pub lang: Option<String>,
 }
 
 /// `GET /mail/{mailbox_id}/compose` — the reply/compose screen.
@@ -953,27 +1048,23 @@ pub async fn compose_page(
     State(state): State<AppState>,
     auth: PageAuth,
     meta: RequestMeta,
+    headers: HeaderMap,
     Path(mailbox_id): Path<String>,
     Query(query): Query<ComposeQuery>,
 ) -> Response {
+    let locale = locale::resolve(&headers, query.lang.as_deref());
     let Some(store) = state.store.as_ref() else {
-        return no_store();
+        return no_store(locale);
     };
     let Ok(mailbox_id) = Uuid::parse_str(&mailbox_id) else {
         return problem(
             StatusCode::BAD_REQUEST,
-            "بيانات غير صالحة",
-            "هذا الطلب لا يحتوي على معرّف صندوق صالح.",
-            "المعرّف المطلوب ناقص أو غير صالح، لذلك لا يمكن الإنشاء.",
+            locale,
+            ProblemKind::BadComposeRequest,
         );
     };
     if auth.0.mailbox_id != Some(mailbox_id) {
-        return problem(
-            StatusCode::NOT_FOUND,
-            "غير موجود",
-            "لا يوجد صندوق بهذا المعرّف.",
-            "قد يكون المعرّف خاطئًا أو تابعًا لمستأجر آخر. الردّ واحد في الحالتين حتى لا يمكن تخمين المعرّفات.",
-        );
+        return problem(StatusCode::NOT_FOUND, locale, ProblemKind::MissingMailbox);
     }
 
     let page = match store
@@ -989,14 +1080,9 @@ pub async fn compose_page(
     {
         Ok(Some(page)) => page,
         Ok(None) => {
-            return problem(
-                StatusCode::NOT_FOUND,
-                "غير موجود",
-                "لا يوجد صندوق بهذا المعرّف.",
-                "قد يكون المعرّف خاطئًا أو تابعًا لمستأجر آخر. الردّ واحد في الحالتين حتى لا يمكن تخمين المعرّفات.",
-            );
+            return problem(StatusCode::NOT_FOUND, locale, ProblemKind::MissingMailbox);
         }
-        Err(err) => return unavailable(err),
+        Err(err) => return unavailable(locale, err),
     };
 
     let to = query
@@ -1014,10 +1100,11 @@ pub async fn compose_page(
         .unwrap_or("")
         .to_string();
 
-    html(
+    let response = html(
         StatusCode::OK,
-        pages::compose(&mailbox_model(&page), &to, &subject, "", None),
-    )
+        pages::compose(locale, &mailbox_model(&page), &to, &subject, "", None),
+    );
+    persist_locale(response, query.lang.as_deref())
 }
 
 /// Query string for the profile page. Only fixed, known values are turned into
@@ -1028,6 +1115,8 @@ pub struct ProfileQuery {
     status: Option<String>,
     #[serde(default)]
     error: Option<String>,
+    #[serde(default)]
+    lang: Option<String>,
 }
 
 /// `GET /profile`
@@ -1038,9 +1127,12 @@ pub async fn profile_page(
     State(state): State<AppState>,
     auth: PageAuth,
     meta: RequestMeta,
+    headers: HeaderMap,
     Query(query): Query<ProfileQuery>,
 ) -> Response {
-    render_profile(&state, &auth, &meta, &query).await
+    let locale = locale::resolve(&headers, query.lang.as_deref());
+    let response = render_profile(&state, &auth, &meta, &query, locale).await;
+    persist_locale(response, query.lang.as_deref())
 }
 
 async fn render_profile(
@@ -1048,9 +1140,10 @@ async fn render_profile(
     auth: &PageAuth,
     _meta: &RequestMeta,
     query: &ProfileQuery,
+    locale: Locale,
 ) -> Response {
     let Some(store) = state.store.as_ref() else {
-        return no_store();
+        return no_store(locale);
     };
     let Some(mailbox_id) = auth.0.mailbox_id else {
         return Redirect::to("/").into_response();
@@ -1059,29 +1152,26 @@ async fn render_profile(
 
     let profile = match store.mailbox_profile(mailbox_id, tenant_id).await {
         Ok(Some(profile)) => profile,
-        Ok(None) => {
-            return problem(
-                StatusCode::NOT_FOUND,
-                "غير موجود",
-                "لا يوجد صندوق بهذا المعرّف.",
-                "قد يكون المعرّف خاطئًا أو تابعًا لمستأجر آخر. الردّ واحد في الحالتين حتى لا يمكن تخمين المعرّفات.",
-            )
-        }
-        Err(err) => return unavailable(err),
+        Ok(None) => return problem(StatusCode::NOT_FOUND, locale, ProblemKind::MissingMailbox),
+        Err(err) => return unavailable(locale, err),
     };
 
     let sessions = match store.list_mailbox_sessions(mailbox_id, tenant_id).await {
         Ok(sessions) => sessions,
-        Err(err) => return unavailable(err),
+        Err(err) => return unavailable(locale, err),
     };
 
-    let (status, error) = profile_notice(query);
+    let (status, error) = profile_notice(locale, query);
+    let text = locale.shell();
 
     let model = ProfileModel {
         mailbox: mailbox_model_from_profile(&profile),
         display_name: profile.display_name.clone(),
         address: profile.address.clone(),
-        created_label: format::full_stamp(profile.created_at.with_timezone(&Local).fixed_offset()),
+        created_label: format::full_stamp(
+            locale,
+            profile.created_at.with_timezone(&Local).fixed_offset(),
+        ),
         message_count: profile.message_count,
         password_set: profile.password_set,
         engine_state: profile.engine_state.clone(),
@@ -1091,16 +1181,17 @@ async fn render_profile(
                 id: session.id.to_string(),
                 label: session.label.clone(),
                 created_label: format::full_stamp(
+                    locale,
                     session.created_at.with_timezone(&Local).fixed_offset(),
                 ),
                 last_used_label: session
                     .last_used_at
-                    .map(|at| format::full_stamp(at.with_timezone(&Local).fixed_offset()))
-                    .unwrap_or_else(|| "لم تُستخدم بعد".to_string()),
+                    .map(|at| format::full_stamp(locale, at.with_timezone(&Local).fixed_offset()))
+                    .unwrap_or_else(|| text.never_used.to_string()),
                 expires_label: session
                     .expires_at
-                    .map(|at| format::full_stamp(at.with_timezone(&Local).fixed_offset()))
-                    .unwrap_or_else(|| "لا تنتهي".to_string()),
+                    .map(|at| format::full_stamp(locale, at.with_timezone(&Local).fixed_offset()))
+                    .unwrap_or_else(|| text.never_expires.to_string()),
                 is_current: session.id == auth.0.token_id,
             })
             .collect(),
@@ -1109,7 +1200,7 @@ async fn render_profile(
         error,
     };
 
-    html(StatusCode::OK, pages::profile(&model))
+    html(StatusCode::OK, pages::profile(locale, &model))
 }
 
 fn mailbox_model_from_profile(profile: &MailboxProfile) -> MailboxModel {
@@ -1123,31 +1214,33 @@ fn mailbox_model_from_profile(profile: &MailboxProfile) -> MailboxModel {
     }
 }
 
-fn profile_notice(query: &ProfileQuery) -> (Option<&'static str>, Option<&'static str>) {
+fn profile_notice(
+    locale: Locale,
+    query: &ProfileQuery,
+) -> (Option<&'static str>, Option<&'static str>) {
+    let text = locale.shell();
     let status = match query.status.as_deref() {
-        Some("name-saved") => Some("حُفظ الاسم الظاهر."),
-        Some("password-set") => Some("ضُبطت كلمة المرور. يمكنك الآن الدخول بها بدل التوكن."),
-        Some("password-changed") => {
-            Some("تغيّرت كلمة المرور، وأُلغيت كل الجلسات الأخرى على هذا الصندوق.")
-        }
-        Some("session-revoked") => Some("أُلغيت الجلسة المحددة."),
-        Some("others-revoked") => Some("أُلغيت كل الجلسات الأخرى."),
-        Some("no-other-sessions") => Some("لا توجد جلسات أخرى نشطة."),
+        Some("name-saved") => Some(text.status_name_saved),
+        Some("password-set") => Some(text.status_password_set),
+        Some("password-changed") => Some(text.status_password_changed),
+        Some("session-revoked") => Some(text.status_session_revoked),
+        Some("others-revoked") => Some(text.status_others_revoked),
+        Some("no-other-sessions") => Some(text.status_no_other_sessions),
         _ => None,
     };
 
     let error = match query.error.as_deref() {
-        Some("name-too-long") => Some("الاسم الظاهر طويل جدًا: الحد 80 حرفًا."),
-        Some("password-short") => Some("كلمة المرور قصيرة: 12 حرفًا على الأقل."),
-        Some("password-long") => Some("كلمة المرور طويلة جدًا: الحد 128 حرفًا."),
-        Some("password-mismatch") => Some("تأكيد كلمة المرور لا يطابقها."),
-        Some("password-same") => Some("اختر كلمة مرور مختلفة عن الحالية."),
-        Some("password-equals-email") => Some("لا تستخدم بريدك أو اسمه المحلي ككلمة مرور."),
-        Some("current-required") => Some("أدخل كلمة المرور الحالية أولًا."),
-        Some("current-wrong") => Some("كلمة المرور الحالية غير صحيحة."),
-        Some("rate-limited") => Some("محاولات كثيرة. انتظر عشر دقائق ثم أعد المحاولة."),
-        Some("session-not-found") => Some("الجلسة غير موجودة أو أُلغيت مسبقًا."),
-        Some("hash-failed") => Some("تعذّر توليد بصمة كلمة المرور. أعد المحاولة."),
+        Some("name-too-long") => Some(text.err_name_too_long),
+        Some("password-short") => Some(text.err_password_short),
+        Some("password-long") => Some(text.err_password_long),
+        Some("password-mismatch") => Some(text.err_password_mismatch),
+        Some("password-same") => Some(text.err_password_same),
+        Some("password-equals-email") => Some(text.err_password_equals_email),
+        Some("current-required") => Some(text.err_current_required),
+        Some("current-wrong") => Some(text.err_current_wrong),
+        Some("rate-limited") => Some(text.err_rate_limited),
+        Some("session-not-found") => Some(text.err_session_not_found),
+        Some("hash-failed") => Some(text.err_hash_failed),
         _ => None,
     };
 
@@ -1173,10 +1266,12 @@ pub async fn profile_display_name(
     State(state): State<AppState>,
     auth: PageAuth,
     meta: RequestMeta,
+    headers: HeaderMap,
     Form(form): Form<DisplayNameForm>,
 ) -> Response {
+    let locale = locale::resolve(&headers, None);
     let Some(store) = state.store.as_ref() else {
-        return no_store();
+        return no_store(locale);
     };
     let Some(mailbox_id) = auth.0.mailbox_id else {
         return Redirect::to("/").into_response();
@@ -1191,15 +1286,8 @@ pub async fn profile_display_name(
 
     match store.set_display_name(mailbox_id, tenant_id, value).await {
         Ok(true) => {}
-        Ok(false) => {
-            return problem(
-                StatusCode::NOT_FOUND,
-                "غير موجود",
-                "لا يوجد صندوق بهذا المعرّف.",
-                "قد يكون الصندوق قد حُذف أو لم يعد تابعًا لهذا المستأجر.",
-            )
-        }
-        Err(err) => return unavailable(err),
+        Ok(false) => return problem(StatusCode::NOT_FOUND, locale, ProblemKind::DeletedMailbox),
+        Err(err) => return unavailable(locale, err),
     }
 
     let object = format!("mailbox:{mailbox_id}");
@@ -1215,7 +1303,7 @@ pub async fn profile_display_name(
         )
         .await
     {
-        return unavailable(err);
+        return unavailable(locale, err);
     }
 
     redirect_profile_status("name-saved")
@@ -1241,10 +1329,12 @@ pub async fn profile_password(
     State(state): State<AppState>,
     auth: PageAuth,
     meta: RequestMeta,
+    headers: HeaderMap,
     Form(form): Form<PasswordForm>,
 ) -> Response {
+    let locale = locale::resolve(&headers, None);
     let Some(store) = state.store.as_ref() else {
-        return no_store();
+        return no_store(locale);
     };
     let Some(mailbox_id) = auth.0.mailbox_id else {
         return Redirect::to("/").into_response();
@@ -1265,15 +1355,8 @@ pub async fn profile_password(
 
     let profile = match store.mailbox_profile(mailbox_id, tenant_id).await {
         Ok(Some(profile)) => profile,
-        Ok(None) => {
-            return problem(
-                StatusCode::NOT_FOUND,
-                "غير موجود",
-                "لا يوجد صندوق بهذا المعرّف.",
-                "قد يكون الصندوق قد حُذف أو لم يعد تابعًا لهذا المستأجر.",
-            )
-        }
-        Err(err) => return unavailable(err),
+        Ok(None) => return problem(StatusCode::NOT_FOUND, locale, ProblemKind::DeletedMailbox),
+        Err(err) => return unavailable(locale, err),
     };
 
     // When a credential already exists, the current password must be proven.
@@ -1286,7 +1369,7 @@ pub async fn profile_password(
         let hash = match store.password_hash(mailbox_id, tenant_id).await {
             Ok(Some(hash)) => hash,
             Ok(None) => return redirect_profile_error("current-required"),
-            Err(err) => return unavailable(err),
+            Err(err) => return unavailable(locale, err),
         };
         // Reserve atomically before the Argon2 verify, closing the same
         // check-then-act race as login. Only an actual current-password guess
@@ -1309,7 +1392,7 @@ pub async fn profile_password(
                 )
                 .await
             {
-                return unavailable(err);
+                return unavailable(locale, err);
             }
 
             return redirect_profile_error("current-wrong");
@@ -1345,7 +1428,7 @@ pub async fn profile_password(
     };
 
     if let Err(err) = store.set_password(mailbox_id, tenant_id, &hash).await {
-        return unavailable(err);
+        return unavailable(locale, err);
     }
 
     // The current session stays; every other mailbox session is cut. The user
@@ -1356,7 +1439,7 @@ pub async fn profile_password(
         .await
     {
         Ok(count) => count,
-        Err(err) => return unavailable(err),
+        Err(err) => return unavailable(locale, err),
     };
 
     let action = if profile.password_set {
@@ -1377,7 +1460,7 @@ pub async fn profile_password(
         )
         .await
     {
-        return unavailable(err);
+        return unavailable(locale, err);
     }
 
     state.login_limiter.clear(&limiter_key);
@@ -1399,10 +1482,12 @@ pub async fn profile_revoke_session(
     State(state): State<AppState>,
     auth: PageAuth,
     meta: RequestMeta,
+    headers: HeaderMap,
     Form(form): Form<RevokeSessionForm>,
 ) -> Response {
+    let locale = locale::resolve(&headers, None);
     let Some(store) = state.store.as_ref() else {
-        return no_store();
+        return no_store(locale);
     };
     let Some(mailbox_id) = auth.0.mailbox_id else {
         return Redirect::to("/").into_response();
@@ -1418,7 +1503,7 @@ pub async fn profile_revoke_session(
         .await
     {
         Ok(revoked) => revoked,
-        Err(err) => return unavailable(err),
+        Err(err) => return unavailable(locale, err),
     };
 
     let object = format!("session:{session_id}");
@@ -1434,7 +1519,7 @@ pub async fn profile_revoke_session(
         )
         .await
     {
-        return unavailable(err);
+        return unavailable(locale, err);
     }
 
     if !revoked {
@@ -1452,9 +1537,11 @@ pub async fn profile_revoke_others(
     State(state): State<AppState>,
     auth: PageAuth,
     meta: RequestMeta,
+    headers: HeaderMap,
 ) -> Response {
+    let locale = locale::resolve(&headers, None);
     let Some(store) = state.store.as_ref() else {
-        return no_store();
+        return no_store(locale);
     };
     let Some(mailbox_id) = auth.0.mailbox_id else {
         return Redirect::to("/").into_response();
@@ -1466,7 +1553,7 @@ pub async fn profile_revoke_others(
         .await
     {
         Ok(count) => count,
-        Err(err) => return unavailable(err),
+        Err(err) => return unavailable(locale, err),
     };
 
     let object = format!("mailbox:{mailbox_id}");
@@ -1482,7 +1569,7 @@ pub async fn profile_revoke_others(
         )
         .await
     {
-        return unavailable(err);
+        return unavailable(locale, err);
     }
 
     if revoked == 0 {
@@ -1565,6 +1652,27 @@ pub async fn asset_nav_a11y() -> Response {
         .into_response()
 }
 
+/// `GET /assets/auth.js`
+///
+/// The login/signup enhancer. Served only because the auth pages reference it;
+/// it is self-hosted like every other asset and carries a content-derived
+/// ETag, so an edit busts the cache. `max-age=300` matches the other
+/// first-party scripts: this one may evolve.
+pub async fn asset_auth_js() -> Response {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "public, max-age=300"),
+            (header::ETAG, tira_frontend::assets::AUTH_ETAG.as_str()),
+        ],
+        tira_frontend::assets::AUTH_JS,
+    )
+        .into_response()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1606,7 +1714,7 @@ mod tests {
 
     #[test]
     fn rendered_pages_are_never_cacheable() {
-        let response = html(StatusCode::OK, pages::login(None));
+        let response = html(StatusCode::OK, pages::login(Locale::Ar, None));
         assert_eq!(
             response.headers().get(header::CACHE_CONTROL).unwrap(),
             "no-store"

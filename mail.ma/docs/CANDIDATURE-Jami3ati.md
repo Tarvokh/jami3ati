@@ -96,6 +96,8 @@
 | تحقّق من المصادر | Elmoufid Hamza | مراجعة المؤسسات، تصنيف `verified` / `needs_review` |
 
 > الأسماء أعلاه هي الفريق الفعلي: ثلاثة أعضاء، لكل دور شاغله. لا دور مضاف بلا شاغل.
+>
+> **لا يحمل هذا الجدول أي تاريخ ميلاد، ولا يُضاف إليه.** الحد الأدنى من المعطيات: الاسم والدور فقط.
 
 ## 10. ما لا ندّعيه
 
@@ -195,6 +197,8 @@ E-mail uniquement dans la version pilote (pas de SMS, pas de téléphone). Conse
 | Vérification des sources | Elmoufid Hamza | Revue des établissements, statuts `verified` / `needs_review` |
 
 > Les noms ci-dessus sont l'équipe réelle : trois membres, un titulaire par rôle. Aucun rôle ajouté sans titulaire.
+>
+> **Ce tableau ne contient aucune date de naissance, et il ne doit pas en contenir.** Minimisation : nom et rôle uniquement.
 
 ## 10. Ce que nous ne prétendons pas
 

@@ -47,6 +47,25 @@ pub enum StoreError {
     InvalidToken(String),
 }
 
+impl StoreError {
+    /// True when PostgreSQL rejected the statement with `23505`
+    /// (`unique_violation`).
+    ///
+    /// Signup and provisioning both need to turn "that address already exists"
+    /// into a sentence for a person. Matching on the SQLSTATE is the only
+    /// stable way to do that: the human-readable message is localised by the
+    /// server's `lc_messages` and changes between releases.
+    pub fn is_unique_violation(&self) -> bool {
+        matches!(
+            self,
+            StoreError::Db(err)
+                if err
+                    .code()
+                    .is_some_and(|code| *code == tokio_postgres::error::SqlState::UNIQUE_VIOLATION)
+        )
+    }
+}
+
 /// Cheap to clone: the pool and the blob store are both behind `Arc`.
 #[derive(Clone)]
 pub struct PgStore {
@@ -129,6 +148,23 @@ impl PgStore {
             tenant_id,
             name,
         })
+    }
+
+    /// Looks up a domain by its exact (lowercase) name, returning
+    /// `(tenant_id, domain_id)`.
+    ///
+    /// Local signup needs this before any tenant context exists, so it uses the
+    /// owner connection exactly like login does. A missing row is `None`, never
+    /// an error: the caller decides whether that means "run the bootstrap".
+    pub async fn domain_by_name(&self, name: &str) -> Result<Option<(Uuid, Uuid)>, StoreError> {
+        let client = self.client().await?;
+        let row = client
+            .query_opt(
+                "SELECT tenant_id, id FROM domains WHERE name = $1",
+                &[&name.trim().to_ascii_lowercase()],
+            )
+            .await?;
+        Ok(row.map(|row| (row.get(0), row.get(1))))
     }
 
     pub async fn create_mailbox(
