@@ -8,9 +8,11 @@
 
 ## قبل الصعود (تحضير دقيقتين)
 
+> إنشاء القاعدة والبيئة من الصفر: راجع [`QUICKSTART.md`](../../../QUICKSTART.md).
+
 ```powershell
-# 1) الخادم
-cd C:\Users\HSYSTEM\Desktop\project\-Jami3ati-main\-Jami3ati-main\backend
+# 1) الخادم — من جذر المستودع
+cd ".\-Jami3ati-main\-Jami3ati-main\backend"
 $env:DATABASE_URL="postgresql://postgres@127.0.0.1:55432/jami3ati_demo"
 $env:JAMI3ATI_HMAC_SECRET="demo-secret"
 $env:JAMI3ATI_ADMIN_TOKEN="demo-admin"
@@ -160,7 +162,8 @@ if (-not $srcId) {
     -Headers @{"X-Jami3ati-Admin"="demo-admin"}
 }
 
-# 3) اكتب قيمة جديدة تختلف عن أي قيمة سابقة ثم استقصِ → واقعة pending
+# 3) غيّر التاريخ فقط (أبقِ بقية الصفحة كما هي) ثم استقصِ → واقعة pending
+#    استخدم تاريخًا لم تستعمله بعد: 15 ديسمبر ← 20 ← 25 ← 30
 [System.IO.File]::WriteAllText("C:\temp\jami3ati-demo\index.html",
   "<html><body><h1>إعلان</h1><p>أجل الترشيح: 20 ديسمبر 2026</p></body></html>", $utf8)
 Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/sources/$srcId/poll" `
@@ -171,6 +174,30 @@ Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/v1/sources/$srcId
 (تاريخ آخر) واستقصِ مرة أخرى. لا تعِد كتابة نفس القيمة وتتوقع تغييرًا.
 
 ثم أكمل المشهد 2 (المراجعة) والمشهد 3 (`/n/{id}`).
+
+> **غيّر التاريخ فقط.** تغيير العنوان أيضًا يجعل الفرق سطرين ويشتّت المشهد؛
+> الجمهور يجب أن يرى سطرًا واحدًا: `15 ديسمبر → 20 ديسمبر`.
+
+---
+
+## بروفة 19 نوفمبر 2026 — نتائج مقيسة
+
+نُفّذ السيناريو مرتين كاملتين على `jami3ati_demo`:
+
+| الخطوة | النتيجة المقيسة |
+|---|---|
+| `POST /sources/src-uit-admission/poll` | `not_modified`، `fact_id=null` — لا واقعة |
+| `POST /sources/src-78a655025d/poll` بعد تغيير التاريخ | `changed`، واقعة `pending` |
+| `GET /n/{id}` قبل الاعتماد | **404** |
+| `POST /facts/{id}/approve` | إشعار `source_change` + صفّا تسليم `pending` |
+| إعادة الاعتماد | **نفس** `notification_id` (idempotent) |
+| `GET /n/{id}` بعد الاعتماد | **200**، CSP صارم، بلا `<script>` |
+| سلسلة البصمات | `previous_hash` للواقعة الثانية = بصمة الأولى |
+| الطابور | بقي `pending`؛ **لا بريد أُرسل** |
+
+> بعد البروفة أُعيدت قاعدة العرض إلى الحالة النظيفة: مصدران، واقعة واحدة معتمدة،
+> إشعار واحد، صفّا تسليم `pending`، صفر يتيم. الاستقصاء بعد الإعادة:
+> `not_modified` — أي أن البصمة المحفوظة تطابق الصفحة.
 
 ---
 
