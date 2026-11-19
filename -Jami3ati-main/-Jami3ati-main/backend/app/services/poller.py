@@ -19,6 +19,7 @@ look like a change; the diff is shown to the reviewer precisely so that noise
 is rejected before it becomes a public fact.
 """
 
+import codecs
 import difflib
 import hashlib
 import logging
@@ -110,25 +111,46 @@ def http_fetch(
 
 
 def _decode_body(response: httpx.Response) -> str:
-    """Decode without turning an undeclared charset into mojibake.
+    """Decode without turning a missing or wrong charset into mojibake.
 
-    Many Moroccan sites omit `charset` or declare it only in a `<meta>` tag.
-    The declared header is tried first, then UTF-8, then Windows-1252 (the
-    common legacy fallback), and only then a lossy UTF-8 decode.
+    Many Moroccan sites omit `charset`, or declare a legacy one
+    (`iso-8859-1`, `windows-1252`) while actually serving UTF-8 bytes.
+    A byte-order mark is the one signal that is never wrong, so it is
+    honoured first; otherwise UTF-8 wins over a declared legacy charset.
+    A genuine single-byte page still decodes through its declared
+    charset or the Windows-1252 fallback.
     """
     content = response.content
-    declared = response.encoding
+    declared = (response.encoding or "").lower()
+
+    for bom, encoding in (
+        (codecs.BOM_UTF32_LE, "utf-32"),
+        (codecs.BOM_UTF32_BE, "utf-32"),
+        (codecs.BOM_UTF8, "utf-8-sig"),
+        (codecs.BOM_UTF16_LE, "utf-16"),
+        (codecs.BOM_UTF16_BE, "utf-16"),
+    ):
+        if content.startswith(bom):
+            try:
+                return content.decode(encoding)
+            except (LookupError, UnicodeDecodeError):
+                break
+
+    try:
+        return content.decode("utf-8")
+    except UnicodeDecodeError:
+        pass
+
     if declared:
         try:
             return content.decode(declared)
         except (LookupError, UnicodeDecodeError):
             pass
-    for encoding in ("utf-8", "windows-1252"):
-        try:
-            return content.decode(encoding)
-        except UnicodeDecodeError:
-            continue
-    return content.decode("utf-8", errors="replace")
+
+    try:
+        return content.decode("windows-1252")
+    except UnicodeDecodeError:
+        return content.decode("utf-8", errors="replace")
 
 
 # --------------------------------------------------------------------------

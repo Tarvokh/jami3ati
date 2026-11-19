@@ -6,6 +6,10 @@ an alert, an empty page is an error, robots is obeyed, and nothing is public
 until a human approves it.
 """
 
+import codecs
+
+import httpx
+
 from app.core.clock import utcnow
 from app.models.fact import FactModel
 from app.models.notification import NotificationDeliveryModel, NotificationModel
@@ -333,3 +337,70 @@ def test_source_rejects_a_non_http_url(client):
         headers={"X-Jami3ati-Admin": "test-admin-token"},
     )
     assert response.status_code == 422
+
+
+def _response(body: bytes, content_type: str) -> httpx.Response:
+    return httpx.Response(200, content=body, headers={"content-type": content_type})
+
+
+def test_decode_body_reads_utf8_when_the_header_omits_charset():
+    text = "إعلان القبول — أجل الترشيح"
+
+    decoded = poller._decode_body(_response(text.encode("utf-8"), "text/html"))
+
+    assert decoded == text
+    assert "Ã" not in decoded and "Ø" not in decoded
+
+
+def test_decode_body_prefers_utf8_over_a_wrong_latin1_header():
+    # Some servers declare iso-8859-1 while serving UTF-8 bytes. Trusting the
+    # header would store mojibake in the snapshot, the diff, and the mail.
+    text = "إعلان القبول"
+
+    decoded = poller._decode_body(
+        _response(text.encode("utf-8"), "text/html; charset=iso-8859-1")
+    )
+
+    assert decoded == text
+
+
+def test_decode_body_keeps_a_genuine_windows1252_page():
+    text = "Délai d'inscription"
+
+    decoded = poller._decode_body(
+        _response(text.encode("windows-1252"), "text/html; charset=windows-1252")
+    )
+
+    assert decoded == text
+
+
+def test_decode_body_honours_an_explicit_utf16_header():
+    text = "إعلان"
+
+    decoded = poller._decode_body(
+        _response(text.encode("utf-16"), "text/html; charset=utf-16")
+    )
+
+    assert decoded == text
+
+
+def test_decode_body_ignores_a_utf16_header_when_the_bytes_are_utf8():
+    # A wrong `charset=utf-16` would otherwise decode UTF-8 bytes into
+    # garbage without raising, so the BOM is the deciding signal.
+    text = "إعلان القبول"
+
+    decoded = poller._decode_body(
+        _response(text.encode("utf-8"), "text/html; charset=utf-16")
+    )
+
+    assert decoded == text
+
+
+def test_decode_body_strips_a_utf8_bom():
+    text = "إعلان القبول"
+
+    decoded = poller._decode_body(
+        _response(codecs.BOM_UTF8 + text.encode("utf-8"), "text/html")
+    )
+
+    assert decoded == text

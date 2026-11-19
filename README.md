@@ -35,7 +35,7 @@
 | المكوّن | ما هو | القياس الفعلي |
 |---|---|---|
 | **Tira Mail** | Rust workspace، 8 crates، 10 migrations، axum 0.8، lettre 0.11.23 (rustls) | **302** اختبارًا ناجحًا، **0** فاشل، **0** متجاهَل — 33 target |
-| **Jami3ati API** | FastAPI + PostgreSQL 16 مع RLS | **72** اختبارًا ناجحًا، **0** فاشل — منها **15** لحلقة الرصد |
+| **Jami3ati API** | FastAPI + PostgreSQL 16 مع RLS | **78** اختبارًا ناجحًا، **0** فاشل — منها **21** لحلقة الرصد |
 | **حلقة الرصد** | `sources` · `fact_history` · `poller` · `/n/{id}` | مصدران: رسمي واحد + تقني موسوم غير رسمي؛ **واقعة واحدة** معتمدة؛ صفحة إثبات حيّة (`200`، CSP صارم، بلا JavaScript) |
 | **كتالوج العرض** | `src/data/seedData.ts` | **12** كيانًا: 3 جامعات + 9 مؤسسات — منها **10 `verified`** |
 | **قاعدة العرض** | `jami3ati_demo` | **3** كيانات: جامعتان + مؤسسة واحدة؛ ومصدران وواقعة واحدة معتمدة |
@@ -184,7 +184,7 @@ single HTTP contract (`POST /api/v1/outbound`, `202 Accepted`, mandatory
 `idempotency_key`, closed header set). No shared database.
 
 **Measured on 19 November 2026:** 302 Tira tests passed (0 failed, 0 ignored,
-33 targets); 72 Jami3ati tests passed (15 for the observation loop). The loop is
+33 targets); 78 Jami3ati tests passed (21 for the observation loop). The loop is
 live: 2 registered sources (1 official, 1 non-official rehearsal), 1 approved
 fact, and a public `/n/{id}` page (200, strict CSP, no JavaScript). Demo
 catalogue: 12 entities, 10 `verified`. Demo database: 3 entities (2 universities

@@ -67,7 +67,7 @@ npm run dev        # http://127.0.0.1:3000
 cd ".\-Jami3ati-main\-Jami3ati-main\backend"
 $env:DATABASE_URL="postgresql://postgres@127.0.0.1:55432/jami3ati_test"
 python -m pytest
-# المقيس: 72 passed
+# المقيس: 78 passed
 ```
 
 الواجهة:
@@ -105,7 +105,7 @@ cargo run -p tira-api         # http://127.0.0.1:8080
 ## English summary
 
 Measured from a clean clone of `Tarvokh/jami3ati` on 19 November 2026:
-`pip install -r requirements.txt` then `pytest` → **72 passed**;
+`pip install -r requirements.txt` then `pytest` → **78 passed**;
 `npm ci` → 256 packages, `npm run lint` and `npm run build` → exit 0;
 Tira `dev.ps1 test-db` → **302 passed**, 33 targets. Tables are created on
 import. No email is sent without Tira credentials; deliveries stay `pending`
